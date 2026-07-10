@@ -128,6 +128,28 @@
       min-width: 0;
     }
 
+    .brand-title {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .back-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 650;
+      transition: color 180ms ease;
+    }
+
+    .back-link:hover { color: var(--ink); }
+
+    .brand-separator {
+      color: var(--faint);
+      font-size: 12px;
+    }
+
     .brand h1 {
       margin: 0;
       font-size: 15px;
@@ -581,7 +603,11 @@
   <main class="app">
     <header class="topbar">
       <div class="brand">
-        <h1>Focuscut</h1>
+        <div class="brand-title">
+          <a class="back-link" href="/">Video Tools</a>
+          <span class="brand-separator" aria-hidden="true">/</span>
+          <h1>Focuscut</h1>
+        </div>
         <p id="fileName">No video open</p>
       </div>
       <div class="top-actions">

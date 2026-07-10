@@ -20,7 +20,7 @@ Local tools for editing and processing screen recordings and other video files.
 pnpm video-zoom-editor
 ```
 
-Open `http://127.0.0.1:4320`.
+Open `http://127.0.0.1:4320` for the Video Tools landing page. The editor lives at `http://127.0.0.1:4320/tools/video-zoom-editor`.
 
 ## Structure
 

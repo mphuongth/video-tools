@@ -15,6 +15,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOST = process.env.VIDEO_ZOOM_EDITOR_HOST || '127.0.0.1';
 const PORT = Number(process.env.VIDEO_ZOOM_EDITOR_PORT || 4320);
 const INDEX_HTML_PATH = path.join(__dirname, 'index.html');
+const LANDING_HTML_PATH = path.resolve(__dirname, '../../landing.html');
+const PREVIEW_IMAGE_PATH = path.resolve(__dirname, '../../assets/video-zoom-editor-preview.jpg');
 const TEXT_RENDERER_SOURCE = path.join(__dirname, 'render-text.swift');
 const TEXT_RENDERER_BINARY = path.join(os.tmpdir(), 'video-zoom-editor-render-text');
 const SWIFT_MODULE_CACHE = path.join(os.tmpdir(), 'video-zoom-editor-swift-cache');
@@ -30,7 +32,7 @@ class UserInputError extends Error {
 async function main() {
   const server = createServer(handleRequest);
   server.listen(PORT, HOST, () => {
-    process.stdout.write(`Video zoom editor: http://${HOST}:${PORT}\n`);
+    process.stdout.write(`Video tools: http://${HOST}:${PORT}\n`);
   });
 }
 
@@ -39,7 +41,19 @@ async function handleRequest(req, res) {
     const url = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`);
 
     if (req.method === 'GET' && url.pathname === '/') {
+      return send(res, 200, await readFile(LANDING_HTML_PATH, 'utf8'), 'text/html; charset=utf-8');
+    }
+
+    if (req.method === 'GET' && (url.pathname === '/tools/video-zoom-editor' || url.pathname === '/tools/video-zoom-editor/')) {
       return send(res, 200, await readFile(INDEX_HTML_PATH, 'utf8'), 'text/html; charset=utf-8');
+    }
+
+    if (req.method === 'GET' && url.pathname === '/assets/video-zoom-editor-preview.jpg') {
+      return send(res, 200, await readFile(PREVIEW_IMAGE_PATH), 'image/jpeg');
+    }
+
+    if (req.method === 'GET' && url.pathname === '/favicon.ico') {
+      return send(res, 204, '', 'image/x-icon');
     }
 
     if (req.method === 'GET' && url.pathname === '/api/capabilities') {
