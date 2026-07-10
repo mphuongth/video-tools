@@ -1,0 +1,11 @@
+{
+  "name": "video-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "video-zoom-editor": "node tools/video-zoom-editor/server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

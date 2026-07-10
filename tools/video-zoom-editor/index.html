@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Zoom Editor</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg: #161815;
+      --chrome: #20231f;
+      --panel: #272a25;
+      --panel-raised: #30332d;
+      --ink: #f2f2eb;
+      --muted: #a7aa9f;
+      --faint: #73776d;
+      --line: #3a3e37;
+      --line-strong: #53584e;
+      --accent: #d6f36a;
+      --accent-ink: #1c2310;
+      --text-accent: #f1a96b;
+      --danger: #ff8f83;
+      --ok: #a8d991;
+      --shadow: rgba(5, 7, 5, 0.42);
+      --mono: "SFMono-Regular", "JetBrains Mono", ui-monospace, monospace;
+      --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    body {
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line-strong);
+      background: var(--panel-raised);
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+      min-height: 38px;
+    }
+
+    button:hover { border-color: var(--muted); background: #373b34; }
+    button:active { transform: translateY(1px) scale(0.99); }
+    button:disabled { opacity: 0.48; cursor: not-allowed; }
+
+    .primary {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+    }
+
+    .danger {
+      color: var(--danger);
+      border-color: rgba(168, 61, 49, 0.35);
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    summary:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: auto minmax(0, 1fr);
+      width: 100%;
+      margin: 0 auto;
+      min-height: 100dvh;
+    }
+
+    .workspace,
+    .inspector {
+      background: var(--chrome);
+      min-width: 0;
+    }
+
+    .workspace {
+      display: grid;
+      grid-column: 1;
+      grid-row: 2;
+      grid-template-rows: minmax(0, 1fr) auto;
+      min-height: 0;
+    }
+
+    .topbar {
+      grid-column: 1 / -1;
+      grid-row: 1;
+    }
+
+    .topbar,
+    .inspector-header,
+    .section {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 10px 14px;
+      background: #1d201c;
+    }
+
+    .brand {
+      min-width: 0;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+      letter-spacing: 0;
+      font-weight: 650;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .stage-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 360px;
+      padding: 24px 28px 18px;
+      overflow: auto;
+    }
+
+    .dropzone {
+      width: min(720px, 100%);
+      min-height: 360px;
+      border: 1px dashed var(--line-strong);
+      background: #22251f;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 28px;
+      transition: border-color 160ms ease, background 160ms ease;
+    }
+
+    .dropzone.dragging {
+      border-color: var(--accent);
+      background: #282d22;
+    }
+
+    .dropzone h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .dropzone p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      max-width: 48ch;
+      line-height: 1.55;
+    }
+
+    .stage {
+      display: none;
+      width: min(100%, 1120px);
+    }
+
+    .surface {
+      position: relative;
+      width: 100%;
+      aspect-ratio: var(--video-aspect, 16 / 9);
+      background: #191916;
+      overflow: hidden;
+      border: 1px solid #2f302a;
+      box-shadow: 0 26px 60px -20px var(--shadow);
+      user-select: none;
+    }
+
+    .surface.placing {
+      cursor: crosshair;
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    .surface.placing::after {
+      content: attr(data-place-hint);
+      position: absolute;
+      left: 50%;
+      top: 16px;
+      bottom: auto;
+      transform: translateX(-50%);
+      color: #fff;
+      color: #202412;
+      background: var(--accent);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 5px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .video-layer {
+      position: absolute;
+      inset: 0;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+      background: #191916;
+    }
+
+    .text-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .text-chip {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      max-width: min(72%, 980px);
+      padding: 0.3em 0.48em;
+      color: #fff;
+      background: rgba(18, 18, 16, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      line-height: 1.18;
+      font-weight: 700;
+      text-align: center;
+      white-space: pre-wrap;
+      pointer-events: auto;
+      cursor: grab;
+      touch-action: none;
+      box-shadow: 0 12px 30px -20px rgba(0, 0, 0, 0.65);
+    }
+
+    .text-chip:active { cursor: grabbing; }
+
+    .text-chip.selected {
+      outline: 2px solid var(--text-accent);
+      outline-offset: 3px;
+    }
+
+    .text-chip.placeholder {
+      color: rgba(255, 255, 255, 0.62);
+      background: rgba(18, 18, 16, 0.46);
+      border-style: dashed;
+      font-weight: 500;
+    }
+
+    .zoom-target {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      margin: -9px 0 0 -9px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      pointer-events: none;
+      box-shadow: 0 0 0 4px rgba(214, 243, 106, 0.2);
+    }
+
+    .transport {
+      display: grid;
+      grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      padding: 8px;
+      background: #1c1f1b;
+      border: 1px solid var(--line);
+    }
+
+    .tool-button.active {
+      color: var(--accent-ink);
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .play-button {
+      width: 38px;
+      padding: 0;
+      font-size: 16px;
+    }
+
+    .time {
+      font-family: var(--mono);
+      color: var(--muted);
+      font-size: 12px;
+      min-width: 120px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .timeline {
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--line);
+      background: #1b1e1a;
+    }
+
+    .timeline-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .track {
+      position: relative;
+      height: 54px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(to bottom, transparent 26px, var(--line) 26px, var(--line) 27px, transparent 27px),
+        #22251f;
+      overflow: hidden;
+    }
+
+    .event-bar {
+      position: absolute;
+      top: 6px;
+      height: 18px;
+      min-width: 2px;
+      border-radius: 5px;
+      border: 1px solid rgba(32, 32, 29, 0.12);
+    }
+
+    .event-bar.zoom { background: var(--accent); }
+    .event-bar.text { background: var(--text-accent); top: 31px; height: 16px; }
+    .event-bar.selected { box-shadow: 0 0 0 2px #fff; z-index: 1; }
+
+    .playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--ink);
+      transform: translateX(-1px);
+    }
+
+    .inspector {
+      grid-column: 2;
+      grid-row: 2;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--line);
+    }
+
+    .inspector-header {
+      padding: 14px 16px;
+    }
+
+    .inspector-header h2 {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .status {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .status.error { color: var(--danger); }
+    .status.ok { color: var(--ok); }
+
+    .section {
+      padding: 14px 16px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .section-title h3 {
+      margin: 0;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      text-transform: none;
+    }
+
+    .hint {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .events {
+      flex: 1;
+      overflow: auto;
+    }
+
+    .advanced {
+      border-top: 1px solid var(--line);
+    }
+
+    .advanced summary {
+      padding: 14px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: none;
+    }
+
+    .advanced .section {
+      border-bottom: 0;
+      padding-top: 0;
+    }
+
+    .event-card {
+      border-top: 0;
+      padding: 14px 16px;
+    }
+
+    .event-card.selected {
+      background: #2b2f28;
+    }
+
+    .event-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      padding: 3px 6px;
+      border-radius: 5px;
+      background: #1e211d;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0.035em;
+    }
+
+    input[type="number"],
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #1d201c;
+      color: var(--ink);
+      border-radius: 5px;
+      padding: 8px 9px;
+      min-height: 36px;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 74px;
+      line-height: 1.35;
+    }
+
+    .empty-list {
+      padding: 26px 20px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    .file-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .empty-list strong { display: block; color: var(--ink); margin-bottom: 6px; }
+
+    .event-nav {
+      display: flex;
+      gap: 6px;
+      padding: 10px 12px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .event-nav button { min-height: 32px; padding: 6px 9px; white-space: nowrap; font-size: 12px; }
+    .event-nav button.selected { border-color: var(--accent); color: var(--accent); }
+
+    .advanced-fields { margin-top: 12px; }
+    .advanced-fields summary { color: var(--muted); font-size: 12px; cursor: pointer; }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar { grid-column: 1; }
+      .workspace { grid-column: 1; grid-row: 2; min-height: 620px; }
+      .inspector { grid-column: 1; grid-row: 3; min-height: 360px; border-left: 0; border-top: 1px solid var(--line); }
+
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .top-actions {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .stage-wrap { padding: 12px; min-height: 340px; }
+      .transport { grid-template-columns: auto 1fr auto; }
+      .transport .tool-button { grid-row: 2; }
+      .field-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>Focuscut</h1>
+        <p id="fileName">No video open</p>
+      </div>
+      <div class="top-actions">
+        <input id="fileInput" class="file-input" type="file" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" />
+        <button id="chooseButton" type="button">Open video</button>
+        <button id="exportButton" class="primary" type="button" disabled>Export MP4</button>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <div class="stage-wrap" id="stageWrap">
+        <div class="dropzone" id="dropzone">
+          <div>
+            <h2>Open your screen recording</h2>
+            <p>Drop a QuickTime, OBS, or Loom recording here. Your video stays on this Mac.</p>
+            <button id="dropChooseButton" class="primary" type="button">Choose video</button>
+          </div>
+        </div>
+
+        <div class="stage" id="stage">
+          <div class="surface" id="surface" data-place-hint="">
+            <div class="video-layer" id="videoLayer">
+              <video id="video" playsinline></video>
+            </div>
+            <div class="text-layer" id="textLayer"></div>
+            <div id="zoomTargets"></div>
+          </div>
+
+          <div class="transport">
+            <button id="playButton" class="play-button" type="button" title="Play">▶</button>
+            <button id="zoomMode" class="tool-button" type="button">＋ Zoom</button>
+            <button id="textMode" class="tool-button" type="button">＋ Text</button>
+            <input id="scrubber" type="range" min="0" max="0" step="0.01" value="0" />
+            <div class="time" id="timeReadout">00:00.00 / 00:00.00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline-head">
+          <span>Timeline</span>
+          <span id="editCount">No edits</span>
+        </div>
+        <div class="track" id="track">
+          <div class="playhead" id="playhead"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="inspector">
+      <div class="inspector-header">
+        <h2>Inspector</h2>
+        <div id="status" class="status">Checking local render capabilities...</div>
+      </div>
+
+      <div class="events" id="events">
+        <div class="empty-list"><strong>Nothing selected</strong>Move the playhead, choose Zoom or Text, then click the video.</div>
+      </div>
+
+      <details class="advanced">
+        <summary>New edit defaults</summary>
+        <section class="section">
+          <div class="field-grid">
+            <div class="field">
+              <label for="defaultZoom">Zoom scale</label>
+              <input id="defaultZoom" type="number" min="1.1" max="4" step="0.1" value="1.8" />
+            </div>
+            <div class="field">
+              <label for="defaultDuration">Zoom duration</label>
+              <input id="defaultDuration" type="number" min="0.4" max="10" step="0.1" value="1.6" />
+            </div>
+            <div class="field">
+              <label for="defaultTextDuration">Text duration</label>
+              <input id="defaultTextDuration" type="number" min="0.4" max="30" step="0.1" value="3" />
+            </div>
+            <div class="field">
+              <label for="defaultFontSize">Text size</label>
+              <input id="defaultFontSize" type="number" min="12" max="120" step="1" value="42" />
+            </div>
+          </div>
+        </section>
+      </details>
+
+    </aside>
+  </main>
+
+  <script>
+    const els = {
+      chooseButton: document.getElementById('chooseButton'),
+      dropChooseButton: document.getElementById('dropChooseButton'),
+      fileInput: document.getElementById('fileInput'),
+      dropzone: document.getElementById('dropzone'),
+      stage: document.getElementById('stage'),
+      surface: document.getElementById('surface'),
+      videoLayer: document.getElementById('videoLayer'),
+      video: document.getElementById('video'),
+      textLayer: document.getElementById('textLayer'),
+      zoomTargets: document.getElementById('zoomTargets'),
+      playButton: document.getElementById('playButton'),
+      scrubber: document.getElementById('scrubber'),
+      timeReadout: document.getElementById('timeReadout'),
+      fileName: document.getElementById('fileName'),
+      editCount: document.getElementById('editCount'),
+      exportButton: document.getElementById('exportButton'),
+      status: document.getElementById('status'),
+      zoomMode: document.getElementById('zoomMode'),
+      textMode: document.getElementById('textMode'),
+      defaultZoom: document.getElementById('defaultZoom'),
+      defaultDuration: document.getElementById('defaultDuration'),
+      defaultTextDuration: document.getElementById('defaultTextDuration'),
+      defaultFontSize: document.getElementById('defaultFontSize'),
+      events: document.getElementById('events'),
+      track: document.getElementById('track'),
+      playhead: document.getElementById('playhead'),
+    };
+
+    const state = {
+      mode: 'idle',
+      file: null,
+      objectUrl: '',
+      duration: 0,
+      width: 16,
+      height: 9,
+      zooms: [],
+      texts: [],
+      selected: '',
+      capabilities: null,
+      exporting: false,
+      dragTextId: '',
+    };
+
+    init();
+
+    function init() {
+      bindEvents();
+      loadCapabilities();
+      requestAnimationFrame(tick);
+    }
+
+    function bindEvents() {
+      els.chooseButton.addEventListener('click', () => els.fileInput.click());
+      els.dropChooseButton.addEventListener('click', () => els.fileInput.click());
+      els.fileInput.addEventListener('change', () => {
+        if (els.fileInput.files[0]) loadVideoFile(els.fileInput.files[0]);
+      });
+
+      ['dragenter', 'dragover'].forEach((name) => {
+        els.dropzone.addEventListener(name, (event) => {
+          event.preventDefault();
+          els.dropzone.classList.add('dragging');
+        });
+      });
+      ['dragleave', 'drop'].forEach((name) => {
+        els.dropzone.addEventListener(name, () => els.dropzone.classList.remove('dragging'));
+      });
+      els.dropzone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const file = event.dataTransfer.files[0];
+        if (file) loadVideoFile(file);
+      });
+
+      els.playButton.addEventListener('click', togglePlayback);
+      els.scrubber.addEventListener('input', () => {
+        els.video.currentTime = Number(els.scrubber.value);
+      });
+
+      els.zoomMode.addEventListener('click', () => toggleMode('zoom'));
+      els.textMode.addEventListener('click', () => toggleMode('text'));
+      els.surface.addEventListener('click', handleSurfaceClick);
+      els.exportButton.addEventListener('click', exportVideo);
+
+      els.video.addEventListener('loadedmetadata', () => {
+        state.duration = els.video.duration || 0;
+        state.width = els.video.videoWidth || 16;
+        state.height = els.video.videoHeight || 9;
+        els.scrubber.max = String(state.duration);
+        els.surface.style.setProperty('--video-aspect', `${state.width} / ${state.height}`);
+        updateUI();
+      });
+
+      els.video.addEventListener('play', updatePlayButton);
+      els.video.addEventListener('pause', updatePlayButton);
+    }
+
+    async function loadCapabilities() {
+      try {
+        const response = await fetch('/api/capabilities');
+        state.capabilities = await response.json();
+        const textMode = state.capabilities.textRendering
+          ? state.capabilities.drawtext
+            ? 'drawtext'
+            : 'PNG text fallback'
+          : 'text export unavailable';
+        setStatus(`Ready. ffmpeg: ${yesNo(state.capabilities.ffmpeg)}, ffprobe: ${yesNo(state.capabilities.ffprobe)}, text: ${textMode}.`, 'ok');
+      } catch (error) {
+        setStatus(`Could not read capabilities: ${error.message}`, 'error');
+      }
+      updateUI();
+    }
+
+    function loadVideoFile(file) {
+      if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+      state.file = file;
+      state.objectUrl = URL.createObjectURL(file);
+      state.zooms = [];
+      state.texts = [];
+      state.selected = '';
+      state.mode = 'idle';
+      els.video.src = state.objectUrl;
+      els.video.load();
+      els.dropzone.style.display = 'none';
+      els.stage.style.display = 'block';
+      els.fileName.textContent = file.name;
+      setMode('idle');
+      setStatus('Ready. Move the playhead, then add a zoom or text.', 'ok');
+      updateUI();
+    }
+
+    function toggleMode(mode) {
+      if (!state.file) {
+        setStatus('Open a video first.', 'error');
+        return;
+      }
+      setMode(state.mode === mode ? 'idle' : mode, { announce: true, pulse: true });
+    }
+
+    function setMode(mode, options = {}) {
+      state.mode = mode;
+      els.zoomMode.classList.toggle('active', mode === 'zoom');
+      els.textMode.classList.toggle('active', mode === 'text');
+      els.surface.dataset.placeHint = mode === 'zoom'
+        ? 'Click the area to zoom into'
+        : mode === 'text'
+          ? 'Click where the text should appear'
+          : '';
+
+      if (options.announce) {
+        if (mode === 'idle') {
+          setStatus('Placement cancelled.', 'ok');
+        } else {
+          setStatus(`Click the video to place the ${mode}.`, 'ok');
+        }
+      }
+
+      if (options.pulse && state.file) {
+        els.surface.animate(
+          [
+            { outlineColor: 'rgba(214, 243, 106, 0.1)' },
+            { outlineColor: 'rgba(214, 243, 106, 1)' },
+            { outlineColor: 'rgba(214, 243, 106, 0.76)' },
+          ],
+          { duration: 520, easing: 'ease-out' },
+        );
+      }
+    }
+
+    function handleSurfaceClick(event) {
+      if (!state.file || state.dragTextId) return;
+      if (event.target.closest('.text-chip')) return;
+
+      const point = normalizedPoint(event);
+      if (!point) return;
+
+      if (state.mode === 'zoom') addZoom(point);
+      else if (state.mode === 'text') addText(point);
+    }
+
+    function addZoom(point) {
+      const start = roundTime(els.video.currentTime);
+      const duration = clamp(Number(els.defaultDuration.value) || 1.6, 0.4, 10);
+      const end = roundTime(Math.min(state.duration || start + duration, start + duration));
+      const zoom = {
+        id: uniqueId('z'),
+        start,
+        end,
+        x: roundRatio(point.x),
+        y: roundRatio(point.y),
+        scale: clamp(Number(els.defaultZoom.value) || 1.8, 1.1, 4),
+      };
+
+      const nextZooms = [...state.zooms, zoom];
+      const overlap = findZoomOverlap(nextZooms);
+      if (overlap) {
+        setStatus('Zoom events cannot overlap in v1. Move the playhead outside the existing zoom first.', 'error');
+        return;
+      }
+
+      state.zooms = nextZooms;
+      state.selected = zoom.id;
+      setMode('idle');
+      setStatus('Zoom added. Select it on the timeline to adjust it.', 'ok');
+      updateUI();
+    }
+
+    function addText(point) {
+      const start = roundTime(els.video.currentTime);
+      const duration = clamp(Number(els.defaultTextDuration.value) || 3, 0.4, 30);
+      const end = roundTime(Math.min(state.duration || start + duration, start + duration));
+      const text = {
+        id: uniqueId('t'),
+        start,
+        end,
+        text: '',
+        x: roundRatio(point.x),
+        y: roundRatio(point.y),
+        fontSize: Math.round(clamp(Number(els.defaultFontSize.value) || 42, 12, 120)),
+      };
+
+      state.texts.push(text);
+      state.selected = text.id;
+      setMode('idle');
+      setStatus('Type the text in the inspector to continue.', 'ok');
+      updateUI();
+      const input = document.querySelector(`[data-text-input="${text.id}"]`);
+      if (input) input.focus();
+    }
+
+    function normalizedPoint(event) {
+      const rect = els.surface.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top) / rect.height;
+      if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+      return { x, y };
+    }
+
+    function updateUI() {
+      els.exportButton.disabled = !state.file || state.exporting || !state.capabilities?.videoRendering || Boolean(findZoomOverlap(state.zooms)) || hasEmptyText();
+      els.zoomMode.disabled = !state.file;
+      els.textMode.disabled = !state.file;
+      els.surface.classList.toggle('placing', state.mode === 'zoom' || state.mode === 'text');
+      const total = state.zooms.length + state.texts.length;
+      els.editCount.textContent = total ? `${total} edit${total === 1 ? '' : 's'}` : 'No edits';
+      renderEvents();
+      renderTimeline();
+      renderPreviewOverlays();
+      updateTransport();
+    }
+
+    function tick() {
+      updateTransport();
+      updatePreviewTransform();
+      if (!state.dragTextId) renderActiveTexts();
+      requestAnimationFrame(tick);
+    }
+
+    function updateTransport() {
+      if (!state.file) return;
+      const current = els.video.currentTime || 0;
+      els.scrubber.value = String(current);
+      els.timeReadout.textContent = `${formatTime(current)} / ${formatTime(state.duration)}`;
+      const pct = state.duration ? (current / state.duration) * 100 : 0;
+      els.playhead.style.left = `${pct}%`;
+    }
+
+    function updatePlayButton() {
+      els.playButton.textContent = els.video.paused ? '▶' : 'Ⅱ';
+      els.playButton.title = els.video.paused ? 'Play' : 'Pause';
+    }
+
+    function togglePlayback() {
+      if (!state.file) return;
+      if (els.video.paused) els.video.play();
+      else els.video.pause();
+    }
+
+    function updatePreviewTransform() {
+      const current = els.video.currentTime || 0;
+      const active = activeZoom(current);
+      if (!active) {
+        els.videoLayer.style.transform = 'translate3d(0, 0, 0) scale(1)';
+        return;
+      }
+
+      const zoom = zoomValueAt(active, current);
+      const rect = els.surface.getBoundingClientRect();
+      const tx = clamp(rect.width / 2 - active.x * rect.width * zoom, rect.width - rect.width * zoom, 0);
+      const ty = clamp(rect.height / 2 - active.y * rect.height * zoom, rect.height - rect.height * zoom, 0);
+      els.videoLayer.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${zoom})`;
+    }
+
+    function renderActiveTexts() {
+      if (!state.file) return;
+      const current = els.video.currentTime || 0;
+      const activeTexts = state.texts.filter((text) => current >= text.start && current <= text.end);
+      els.textLayer.innerHTML = activeTexts.map((text) => `
+        <div
+          class="text-chip ${state.selected === text.id ? 'selected' : ''} ${text.text.trim() ? '' : 'placeholder'}"
+          style="left:${text.x * 100}%; top:${text.y * 100}%; font-size:${text.fontSize}px"
+          data-text-chip="${text.id}"
+        >${escapeHtml(text.text.trim() || 'Type your text…')}</div>
+      `).join('');
+
+      for (const chip of els.textLayer.querySelectorAll('.text-chip')) {
+        chip.addEventListener('pointerdown', startTextDrag);
+      }
+    }
+
+    function renderPreviewOverlays() {
+      els.zoomTargets.innerHTML = state.zooms.map((zoom) => `
+        <span class="zoom-target" style="left:${zoom.x * 100}%; top:${zoom.y * 100}%"></span>
+      `).join('');
+      renderActiveTexts();
+    }
+
+    function startTextDrag(event) {
+      const id = event.currentTarget.dataset.textChip;
+      const text = state.texts.find((item) => item.id === id);
+      if (!text) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const chip = event.currentTarget;
+      const pointerId = event.pointerId;
+      state.dragTextId = id;
+      state.selected = id;
+      chip.classList.add('selected');
+      chip.setPointerCapture(pointerId);
+      renderTimeline();
+      renderEvents();
+
+      const move = (moveEvent) => {
+        const point = normalizedPoint(moveEvent);
+        if (!point) return;
+        text.x = roundRatio(point.x);
+        text.y = roundRatio(point.y);
+        chip.style.left = `${text.x * 100}%`;
+        chip.style.top = `${text.y * 100}%`;
+
+        const xInput = els.events.querySelector(`[data-id="${id}"][data-field="x"]`);
+        const yInput = els.events.querySelector(`[data-id="${id}"][data-field="y"]`);
+        if (xInput) xInput.value = text.x;
+        if (yInput) yInput.value = text.y;
+      };
+
+      const stop = () => {
+        state.dragTextId = '';
+        if (chip.hasPointerCapture(pointerId)) chip.releasePointerCapture(pointerId);
+        chip.removeEventListener('pointermove', move);
+        chip.removeEventListener('pointerup', stop);
+        chip.removeEventListener('pointercancel', stop);
+        updateUI();
+      };
+
+      chip.addEventListener('pointermove', move);
+      chip.addEventListener('pointerup', stop);
+      chip.addEventListener('pointercancel', stop);
+    }
+
+    function renderTimeline() {
+      const duration = state.duration || 1;
+      const bars = [
+        ...state.zooms.map((event) => ({ ...event, type: 'zoom' })),
+        ...state.texts.map((event) => ({ ...event, type: 'text' })),
+      ].map((event) => {
+        const left = clamp((event.start / duration) * 100, 0, 100);
+        const width = clamp(((event.end - event.start) / duration) * 100, 0.4, 100 - left);
+        return `<button class="event-bar ${event.type} ${state.selected === event.id ? 'selected' : ''}" style="left:${left}%; width:${width}%" data-select="${event.id}" title="${event.type} ${event.start}s"></button>`;
+      }).join('');
+
+      els.track.innerHTML = `${bars}<div class="playhead" id="playhead"></div>`;
+      els.playhead = document.getElementById('playhead');
+      for (const bar of els.track.querySelectorAll('.event-bar')) {
+        bar.addEventListener('click', (event) => {
+          event.stopPropagation();
+          state.selected = bar.dataset.select;
+          const selected = state.zooms.find((item) => item.id === state.selected) || state.texts.find((item) => item.id === state.selected);
+          if (selected) els.video.currentTime = selected.start;
+          updateUI();
+        });
+      }
+
+      els.track.onclick = (event) => {
+        if (!state.file || event.target.closest('.event-bar')) return;
+        const rect = els.track.getBoundingClientRect();
+        els.video.currentTime = clamp((event.clientX - rect.left) / rect.width, 0, 1) * state.duration;
+      };
+    }
+
+    function renderEvents() {
+      const events = [
+        ...state.zooms.map((event) => ({ ...event, kind: 'zoom' })),
+        ...state.texts.map((event) => ({ ...event, kind: 'text' })),
+      ].sort((a, b) => a.start - b.start);
+
+      if (!events.length) {
+        els.events.innerHTML = state.file
+          ? '<div class="empty-list"><strong>No edits yet</strong>Move the playhead, choose Zoom or Text, then click the video.</div>'
+          : '<div class="empty-list"><strong>Nothing selected</strong>Open a video to start editing.</div>';
+        return;
+      }
+
+      const selected = events.find((event) => event.id === state.selected);
+      const nav = `<nav class="event-nav" aria-label="Edits">${events.map((event, index) => `
+        <button type="button" class="${event.id === state.selected ? 'selected' : ''}" data-select-event="${event.id}">
+          ${event.kind === 'zoom' ? 'Zoom' : 'Text'} ${index + 1}
+        </button>
+      `).join('')}</nav>`;
+      const editor = selected
+        ? selected.kind === 'zoom' ? renderZoomEditor(selected) : renderTextEditor(selected)
+        : '<div class="empty-list"><strong>Select an edit</strong>Click a colored block on the timeline to adjust it.</div>';
+      els.events.innerHTML = nav + editor;
+      bindEventEditors();
+    }
+
+    function renderZoomEditor(event) {
+      return `
+        <article class="event-card ${state.selected === event.id ? 'selected' : ''}" data-card="${event.id}">
+          <div class="event-head">
+            <span class="pill">Zoom</span>
+            <button class="danger" type="button" data-delete="${event.id}">Delete</button>
+          </div>
+          <div class="field-grid">
+            ${numberField(event.id, 'start', 'Start', event.start, 0.01)}
+            ${numberField(event.id, 'end', 'End', event.end, 0.01)}
+            ${numberField(event.id, 'scale', 'Zoom amount', event.scale, 0.1)}
+          </div>
+          <details class="advanced-fields">
+            <summary>Precise position</summary>
+            <div class="field-grid advanced-fields">
+              ${numberField(event.id, 'x', 'Horizontal', event.x, 0.001)}
+              ${numberField(event.id, 'y', 'Vertical', event.y, 0.001)}
+            </div>
+          </details>
+        </article>
+      `;
+    }
+
+    function renderTextEditor(event) {
+      return `
+        <article class="event-card ${state.selected === event.id ? 'selected' : ''}" data-card="${event.id}">
+          <div class="event-head">
+            <span class="pill">Text</span>
+            <button class="danger" type="button" data-delete="${event.id}">Delete</button>
+          </div>
+          <div class="field-grid">
+            <div class="field full">
+              <label for="${event.id}-text">Words</label>
+              <textarea id="${event.id}-text" data-text-input="${event.id}" data-field="text" placeholder="Type your text…">${escapeHtml(event.text)}</textarea>
+            </div>
+            ${numberField(event.id, 'start', 'Start', event.start, 0.01)}
+            ${numberField(event.id, 'end', 'End', event.end, 0.01)}
+            ${numberField(event.id, 'fontSize', 'Text size', event.fontSize, 1)}
+          </div>
+          <details class="advanced-fields">
+            <summary>Precise position</summary>
+            <div class="field-grid advanced-fields">
+              ${numberField(event.id, 'x', 'Horizontal', event.x, 0.001)}
+              ${numberField(event.id, 'y', 'Vertical', event.y, 0.001)}
+            </div>
+          </details>
+        </article>
+      `;
+    }
+
+    function numberField(id, field, label, value, step) {
+      return `
+        <div class="field">
+          <label for="${id}-${field}">${label}</label>
+          <input id="${id}-${field}" type="number" step="${step}" value="${value}" data-id="${id}" data-field="${field}" />
+        </div>
+      `;
+    }
+
+    function bindEventEditors() {
+      for (const button of els.events.querySelectorAll('[data-select-event]')) {
+        button.addEventListener('click', () => {
+          state.selected = button.dataset.selectEvent;
+          const selected = state.zooms.find((item) => item.id === state.selected) || state.texts.find((item) => item.id === state.selected);
+          if (selected) els.video.currentTime = selected.start;
+          updateUI();
+        });
+      }
+
+      for (const button of els.events.querySelectorAll('[data-delete]')) {
+        button.addEventListener('click', (event) => {
+          event.stopPropagation();
+          deleteEvent(button.dataset.delete);
+        });
+      }
+
+      for (const input of els.events.querySelectorAll('[data-field]')) {
+        input.addEventListener('input', () => updateEventField(input));
+      }
+    }
+
+    function updateEventField(input) {
+      const id = input.dataset.id || input.dataset.textInput;
+      const field = input.dataset.field;
+      const event = state.zooms.find((item) => item.id === id) || state.texts.find((item) => item.id === id);
+      if (!event) return;
+
+      if (field === 'text') event.text = input.value.slice(0, 280);
+      else event[field] = Number(input.value);
+
+      if (field === 'x' || field === 'y') event[field] = roundRatio(clamp(event[field], 0, 1));
+      if (field === 'scale') event.scale = clamp(event.scale, 1.1, 4);
+      if (field === 'fontSize') event.fontSize = Math.round(clamp(event.fontSize, 12, 120));
+      if (field === 'start' || field === 'end') {
+        event[field] = roundTime(Math.max(0, event[field]));
+      }
+
+      const overlap = findZoomOverlap(state.zooms);
+      if (overlap) setStatus('Zoom events cannot overlap in v1.', 'error');
+      else if (hasEmptyText()) setStatus('Enter content for the empty text edit before exporting.', 'error');
+      else setStatus('Changes ready for export.', 'ok');
+      els.exportButton.disabled = !state.file || state.exporting || !state.capabilities?.videoRendering || Boolean(overlap) || hasEmptyText();
+      renderTimeline();
+      renderPreviewOverlays();
+    }
+
+    function deleteEvent(id) {
+      state.zooms = state.zooms.filter((event) => event.id !== id);
+      state.texts = state.texts.filter((event) => event.id !== id);
+      if (state.selected === id) state.selected = '';
+      setStatus('Event deleted.', 'ok');
+      updateUI();
+    }
+
+    async function exportVideo() {
+      if (!state.file || state.exporting) return;
+
+      const overlap = findZoomOverlap(state.zooms);
+      if (overlap) {
+        setStatus('Fix overlapping zoom events before export.', 'error');
+        return;
+      }
+
+      if (hasEmptyText()) {
+        setStatus('Enter content for the empty text edit before exporting.', 'error');
+        return;
+      }
+
+      state.exporting = true;
+      updateUI();
+      setStatus('Rendering MP4 with ffmpeg...', 'ok');
+
+      try {
+        const formData = new FormData();
+        formData.append('video', state.file, state.file.name);
+        formData.append('project', JSON.stringify(projectPayload()));
+
+        const response = await fetch('/api/export', { method: 'POST', body: formData });
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error || 'Export failed.');
+        }
+
+        const blob = await response.blob();
+        const outputName = response.headers.get('X-Output-Filename') || outputFileName(state.file.name);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = outputName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setStatus(`Export complete: ${outputName}`, 'ok');
+      } catch (error) {
+        setStatus(error.message, 'error');
+      } finally {
+        state.exporting = false;
+        updateUI();
+      }
+    }
+
+    function projectPayload() {
+      return {
+        zooms: state.zooms.map(({ id, start, end, x, y, scale }) => ({ id, start, end, x, y, scale })),
+        texts: state.texts.map(({ id, start, end, text, x, y, fontSize }) => ({ id, start, end, text, x, y, fontSize })),
+      };
+    }
+
+    function activeZoom(time) {
+      return state.zooms.find((zoom) => time >= zoom.start && time <= zoom.end);
+    }
+
+    function hasEmptyText() {
+      return state.texts.some((text) => !text.text.trim());
+    }
+
+    function zoomValueAt(zoom, time) {
+      const duration = zoom.end - zoom.start;
+      const ramp = Math.min(0.34, Math.max(0.08, duration / 2));
+      if (time <= zoom.start + ramp) {
+        return 1 + (zoom.scale - 1) * easeInOut((time - zoom.start) / ramp);
+      }
+      if (time >= zoom.end - ramp) {
+        return 1 + (zoom.scale - 1) * easeInOut((zoom.end - time) / ramp);
+      }
+      return zoom.scale;
+    }
+
+    function easeInOut(value) {
+      const t = clamp(value, 0, 1);
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function findZoomOverlap(zooms) {
+      const sorted = [...zooms].sort((a, b) => a.start - b.start);
+      for (let index = 1; index < sorted.length; index += 1) {
+        if (sorted[index].start < sorted[index - 1].end) return [sorted[index - 1], sorted[index]];
+      }
+      return null;
+    }
+
+    function setStatus(message, type) {
+      els.status.textContent = message;
+      els.status.classList.toggle('error', type === 'error');
+      els.status.classList.toggle('ok', type === 'ok');
+    }
+
+    function yesNo(value) {
+      return value ? 'yes' : 'no';
+    }
+
+    function uniqueId(prefix) {
+      return `${prefix}${Date.now().toString(36).slice(-5)}${Math.random().toString(36).slice(2, 5)}`;
+    }
+
+    function formatTime(value) {
+      const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
+      const minutes = Math.floor(safe / 60);
+      const seconds = Math.floor(safe % 60);
+      const hundredths = Math.floor((safe % 1) * 100);
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(hundredths).padStart(2, '0')}`;
+    }
+
+    function roundTime(value) {
+      return Math.round(Number(value || 0) * 100) / 100;
+    }
+
+    function roundRatio(value) {
+      return Math.round(Number(value || 0) * 1000) / 1000;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function outputFileName(name) {
+      return String(name || 'recording').replace(/\.[^.]+$/, '') + '.edited.mp4';
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
