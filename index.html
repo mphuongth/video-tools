@@ -754,7 +754,7 @@
   <a class="skip-link" href="#main">Skip to content</a>
 
   <header class="shell nav">
-    <a class="brand" href="/" aria-label="Video Tools home">
+    <a class="brand" href="./" aria-label="Video Tools home">
       <span class="crop" aria-hidden="true"></span>
       <span>Video&nbsp;Tools</span>
     </a>
@@ -763,7 +763,7 @@
       <a href="#workflow">Workflow</a>
       <a href="https://github.com/phuongtruong-agilityio/video-tools">Source</a>
     </nav>
-    <a class="nav-action" href="/tools/video-zoom-editor">Open editor</a>
+    <a class="nav-action" href="tools/video-zoom-editor/">Open editor</a>
   </header>
 
   <main id="main">
@@ -780,7 +780,7 @@
           nothing leaves your machine.
         </p>
         <div class="hero-actions reveal d2">
-          <a class="button" href="/tools/video-zoom-editor">
+          <a class="button" href="tools/video-zoom-editor/">
             Open Video Zoom Editor <span class="arrow" aria-hidden="true">→</span>
           </a>
           <a class="button ghost" href="#tool">See how it works</a>
@@ -852,7 +852,7 @@
           </p>
         </div>
 
-        <a class="tool-row" href="/tools/video-zoom-editor">
+        <a class="tool-row" href="tools/video-zoom-editor/">
           <span class="crop" aria-hidden="true"></span>
           <span>
             <span class="tool-name">Video Zoom Editor</span>
@@ -867,7 +867,7 @@
 
         <figure class="proof reveal">
           <div class="proof-frame">
-            <img src="/assets/video-zoom-editor-preview.jpg" alt="The Video Zoom Editor interface with a screen recording, a zoom focus bracket, timeline, and inspector panel" />
+            <img src="assets/video-zoom-editor-preview.jpg" alt="The Video Zoom Editor interface with a screen recording, a zoom focus bracket, timeline, and inspector panel" />
           </div>
           <figcaption>
             <span>The actual local editor</span>
@@ -920,7 +920,7 @@
         <h2>Make the next recording easier to follow.</h2>
         <p class="sub">Start with the file you already have. It opens in the browser and runs on this machine.</p>
       </div>
-      <a class="button" href="/tools/video-zoom-editor">
+      <a class="button" href="tools/video-zoom-editor/">
         Open Video Zoom Editor <span class="arrow" aria-hidden="true">→</span>
       </a>
     </section>
@@ -934,21 +934,28 @@
   <script>
     const engineState = document.getElementById('engineState');
 
-    fetch('/api/capabilities')
-      .then((response) => {
-        if (!response.ok) throw new Error('Render engine unavailable');
-        return response.json();
-      })
+    fetch('api/capabilities')
+      .then((response) => (response.ok ? response.json() : null))
       .then((capabilities) => {
-        if (!capabilities.videoRendering) throw new Error('ffmpeg or ffprobe missing');
+        if (!capabilities) {
+          // No local render server (e.g. the hosted preview) — degrade quietly.
+          engineState.dataset.state = 'idle';
+          engineState.textContent = 'Runs on your machine';
+          return;
+        }
+        if (!capabilities.videoRendering) {
+          engineState.dataset.state = 'error';
+          engineState.textContent = 'ffmpeg or ffprobe missing';
+          return;
+        }
         engineState.dataset.state = 'ready';
         engineState.textContent = capabilities.textRendering
           ? 'Render engine ready'
           : 'Video rendering ready';
       })
-      .catch((error) => {
-        engineState.dataset.state = 'error';
-        engineState.textContent = error.message;
+      .catch(() => {
+        engineState.dataset.state = 'idle';
+        engineState.textContent = 'Runs on your machine';
       });
   </script>
 </body>

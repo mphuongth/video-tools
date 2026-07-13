@@ -1,0 +1,10 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Deploy: push this repo, then in Render pick "New +" > "Blueprint" and select it.
+services:
+  - type: web
+    name: video-tools
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/capabilities
+    autoDeploy: true

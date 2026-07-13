@@ -7,6 +7,7 @@ It lets you add manual zooms and text callouts after recording, then renders a f
 ## Run
 
 ```sh
+pnpm install
 pnpm video-zoom-editor
 ```
 
@@ -35,7 +36,8 @@ VIDEO_ZOOM_EDITOR_PORT=4321 pnpm video-zoom-editor
 
 - `ffmpeg`
 - `ffprobe`
-- macOS Swift toolchain for text PNG fallback when the local `ffmpeg` build does not include `drawtext`
+
+Zooms are rendered with the `ffmpeg` `zoompan` filter; text overlays are drawn to a PNG with [`@napi-rs/canvas`](https://github.com/Brooooooklyn/canvas) (prebuilt, cross-platform) and composited over the video, so export works on macOS and Linux without a Swift toolchain.
 
 The capabilities endpoint shows what is available:
 
