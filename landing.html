@@ -3,22 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Local tools for shaping screen recordings into clear, focused videos." />
+  <meta name="description" content="Local tools for turning raw screen recordings into clear, focused videos." />
   <title>Video Tools</title>
   <style>
     * { box-sizing: border-box; }
 
     :root {
-      --paper: #f1f2ec;
-      --paper-deep: #e6e8df;
-      --ink: #171914;
-      --muted: #666b61;
-      --faint: #969b90;
-      --line: #cdd0c6;
-      --accent: #bed45e;
-      --accent-deep: #718526;
-      --white: #fbfcf8;
-      --shadow: rgba(42, 47, 35, 0.18);
+      --night: #090a08;
+      --night-soft: #11130f;
+      --ink: #f7f7f3;
+      --muted: #92958d;
+      --line: #272a24;
+      --accent: #7358e8;
+      --accent-hover: #846cf0;
+      --paper: #f2f2ed;
+      --paper-ink: #181a16;
+      --paper-muted: #666a61;
+      --paper-line: #d6d8cf;
       --sans: "Geist", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
       --mono: "Geist Mono", "SFMono-Regular", Consolas, monospace;
       --ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -32,7 +33,7 @@
       min-height: 100dvh;
       overflow-x: hidden;
       color: var(--ink);
-      background: var(--paper);
+      background: var(--night);
       font-family: var(--sans);
       letter-spacing: 0;
     }
@@ -41,10 +42,10 @@
       content: "";
       position: fixed;
       inset: 0;
+      z-index: 5;
       pointer-events: none;
       opacity: 0.025;
-      z-index: 4;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
     }
 
     a { color: inherit; }
@@ -53,33 +54,32 @@
       position: fixed;
       top: 8px;
       left: 8px;
-      z-index: 5;
-      transform: translateY(-150%);
+      z-index: 6;
       padding: 10px 14px;
-      color: var(--white);
-      background: var(--ink);
-      border-radius: 4px;
+      color: var(--ink);
+      background: var(--accent);
+      border-radius: 6px;
+      transform: translateY(-150%);
     }
 
     .skip-link:focus { transform: translateY(0); }
 
     .shell {
-      width: min(1440px, 100%);
+      width: min(1240px, 100%);
       margin: 0 auto;
-      padding-inline: clamp(18px, 4vw, 64px);
+      padding-inline: clamp(18px, 4vw, 48px);
     }
 
-    .topbar {
+    .nav {
       position: relative;
       z-index: 3;
       display: grid;
       grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      min-height: 72px;
-      border-bottom: 1px solid var(--line);
+      min-height: 68px;
     }
 
-    .wordmark {
+    .brand {
       display: inline-flex;
       align-items: center;
       gap: 10px;
@@ -90,36 +90,30 @@
       font-weight: 700;
     }
 
-    .wordmark-mark {
+    .brand-mark {
       position: relative;
-      width: 22px;
-      height: 22px;
-      border: 1px solid var(--ink);
-      border-radius: 3px;
-      overflow: hidden;
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
     }
 
-    .wordmark-mark::before,
-    .wordmark-mark::after {
+    .brand-mark::after {
       content: "";
       position: absolute;
-      left: 4px;
-      right: 4px;
-      height: 3px;
-      background: var(--ink);
+      inset: 5px;
+      border-radius: 50%;
+      background: var(--accent);
     }
 
-    .wordmark-mark::before { top: 5px; }
-    .wordmark-mark::after { bottom: 5px; width: 8px; }
-
-    .topnav {
+    .nav-links {
       display: flex;
-      gap: 26px;
       align-items: center;
       justify-content: center;
+      gap: 30px;
     }
 
-    .topnav a {
+    .nav-links a {
       color: var(--muted);
       text-decoration: none;
       font-size: 13px;
@@ -127,374 +121,583 @@
       transition: color 220ms var(--ease);
     }
 
-    .topnav a:hover { color: var(--ink); }
+    .nav-links a:hover { color: var(--ink); }
 
-    .availability {
+    .nav-action {
+      justify-self: end;
       display: inline-flex;
       align-items: center;
-      justify-self: end;
-      gap: 8px;
-      color: var(--muted);
-      font: 11px/1 var(--mono);
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 15px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--ink);
+      background: var(--accent);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 700;
+      transition: transform 220ms var(--ease), background 220ms var(--ease);
     }
 
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--accent-deep);
-      animation: breathe 2.8s var(--ease) infinite;
-    }
+    .nav-action:hover { background: var(--accent-hover); }
+    .nav-action:active { transform: translateY(1px) scale(0.985); }
 
     .hero {
       position: relative;
-      display: grid;
-      align-items: center;
-      min-height: calc(100dvh - 190px);
+      min-height: 0;
       overflow: hidden;
-      isolation: isolate;
-      border-bottom: 1px solid var(--line);
+      padding: clamp(38px, 5vw, 62px) 0 64px;
+      text-align: center;
     }
 
-    .hero-copy {
+    .focus-mark {
       position: relative;
-      z-index: 2;
-      width: min(570px, 46vw);
-      padding: 74px 0 98px;
+      width: 62px;
+      height: 62px;
+      margin: 0 auto 18px;
+      border: 8px solid var(--accent);
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 7px rgba(9, 10, 8, 0.5);
+      animation: mark-breathe 4.8s var(--ease) infinite;
     }
 
-    .eyebrow {
-      display: flex;
+    .hero-badge {
+      display: inline-flex;
       align-items: center;
-      gap: 12px;
-      margin: 0 0 30px;
-      color: var(--accent-deep);
-      font: 700 11px/1 var(--mono);
-      text-transform: uppercase;
-    }
-
-    .eyebrow::before {
-      content: "";
-      width: 34px;
-      height: 1px;
-      background: currentColor;
+      min-height: 28px;
+      margin-bottom: 18px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: #b7bab1;
+      background: var(--night-soft);
+      font: 10px/1 var(--mono);
     }
 
     h1 {
-      max-width: 8ch;
-      margin: 0;
-      font-size: clamp(52px, 6.4vw, 88px);
-      line-height: 0.88;
+      max-width: 900px;
+      margin: 0 auto;
+      font-size: clamp(44px, 5.4vw, 72px);
+      line-height: 0.98;
       letter-spacing: -0.045em;
       font-weight: 650;
       text-wrap: balance;
     }
 
-    .hero-copy > p {
-      max-width: 48ch;
-      margin: 34px 0 0;
+    .hero-copy {
+      max-width: 660px;
+      margin: 18px auto 0;
       color: var(--muted);
-      font-size: clamp(16px, 1.4vw, 19px);
-      line-height: 1.6;
+      font-size: clamp(16px, 1.5vw, 19px);
+      line-height: 1.55;
       text-wrap: pretty;
     }
 
     .hero-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-top: 38px;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 22px;
     }
 
     .button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 46px;
+      min-height: 44px;
       padding: 0 18px;
-      border: 1px solid var(--ink);
-      border-radius: 5px;
-      color: var(--white);
-      background: var(--ink);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--ink);
+      background: var(--accent);
       text-decoration: none;
       font-size: 13px;
       font-weight: 700;
-      transition: transform 260ms var(--ease), background 260ms var(--ease), color 260ms var(--ease);
+      transition: transform 240ms var(--ease), background 240ms var(--ease), border-color 240ms var(--ease);
     }
 
-    .button:hover {
-      color: var(--ink);
-      background: var(--accent);
-    }
-
+    .button:hover { background: var(--accent-hover); }
     .button:active { transform: translateY(1px) scale(0.985); }
 
     .button.secondary {
       color: var(--ink);
-      background: rgba(241, 242, 236, 0.72);
       border-color: var(--line);
+      background: var(--night-soft);
     }
 
-    .button.secondary:hover { border-color: var(--ink); }
+    .button.secondary:hover { border-color: #484c42; background: #171914; }
 
     .button:focus-visible,
-    .topnav a:focus-visible,
-    .wordmark:focus-visible,
-    .tool-link:focus-visible {
-      outline: 2px solid var(--accent-deep);
+    .nav-action:focus-visible,
+    .brand:focus-visible,
+    .nav-links a:focus-visible,
+    .tool-row:focus-visible {
+      outline: 2px solid var(--accent);
       outline-offset: 3px;
     }
 
-    .hero-media {
-      position: absolute;
-      z-index: 1;
-      top: 54px;
-      right: max(-64px, calc((100vw - 1440px) / -2));
-      bottom: 58px;
-      width: min(69vw, 1000px);
+    .showcase-wrap {
+      position: relative;
+      width: min(1120px, calc(100% - 36px));
+      aspect-ratio: 16 / 8.25;
+      margin: 58px auto 0;
+      padding: clamp(15px, 2.2vw, 25px);
       overflow: hidden;
-      border: 1px solid rgba(205, 208, 198, 0.78);
-      border-radius: 6px 0 0 6px;
-      background: #1b1e1a;
-      box-shadow: 0 38px 80px -54px var(--shadow);
-      transform: perspective(1600px) rotateY(-2deg) rotateZ(0.4deg);
-      transform-origin: right center;
-      animation: media-in 900ms var(--ease) both;
+      border-radius: 8px;
+      background: linear-gradient(125deg, #40b995 0%, #e4a14d 35%, #d95787 68%, #5c61da 100%);
+      box-shadow: 0 -30px 100px -70px rgba(115, 88, 232, 0.78);
     }
 
-    .hero-media::before {
-      content: "";
+    .showcase-window {
+      position: relative;
+      width: 94%;
+      height: 100%;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 7px;
+      background: #181b16;
+      box-shadow: 0 26px 60px -36px rgba(9, 10, 8, 0.82), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      animation: window-float 7s var(--ease) infinite;
+    }
+
+    .demo-browser {
       position: absolute;
       inset: 0;
-      z-index: 1;
-      background: linear-gradient(90deg, var(--paper) 0%, rgba(241, 242, 236, 0.9) 10%, transparent 34%);
-      pointer-events: none;
+      color: #26302b;
+      background: #f3f5f0;
+      font-family: var(--sans);
     }
 
-    .hero-media img {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: cover;
-      object-position: left center;
+    .demo-browserbar {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      height: clamp(24px, 2.7vw, 34px);
+      padding: 0 10px;
+      color: #747c74;
+      background: #e4e7e0;
+      border-bottom: 1px solid #cdd2ca;
+      font: clamp(8px, 0.85vw, 11px)/1 var(--mono);
     }
 
-    .signal-line {
+    .demo-dots { display: flex; gap: 4px; }
+
+    .demo-dots span {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #a7ada5;
+    }
+
+    .demo-address {
+      justify-self: center;
+      width: min(260px, 58%);
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: #f0f2ed;
+      text-align: center;
+    }
+
+    .demo-body {
       position: absolute;
+      inset: clamp(24px, 2.7vw, 34px) 0 clamp(29px, 4.2vw, 54px);
+      display: grid;
+      grid-template-columns: 18% minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .demo-sidebar {
+      padding: clamp(13px, 1.6vw, 21px) clamp(10px, 1.3vw, 17px);
+      color: #dfe4dd;
+      background: #26312b;
+    }
+
+    .demo-sidebar strong {
+      display: block;
+      margin-bottom: 15px;
+      font-size: clamp(9px, 1vw, 13px);
+    }
+
+    .demo-navline {
+      width: 74%;
+      height: clamp(5px, 0.55vw, 7px);
+      margin: 8px 0;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .demo-navline.active { width: 88%; background: rgba(255, 255, 255, 0.62); }
+
+    .demo-main {
+      position: relative;
+      padding: clamp(12px, 1.5vw, 20px) clamp(15px, 1.8vw, 24px);
+      overflow: hidden;
+    }
+
+    .demo-mainhead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .demo-title strong { display: block; font-size: clamp(12px, 1.35vw, 18px); }
+    .demo-title span { display: block; margin-top: 3px; color: #7b827a; font-size: clamp(7px, 0.78vw, 10px); }
+
+    .demo-action {
+      min-width: clamp(84px, 10vw, 132px);
+      padding: clamp(7px, 0.85vw, 11px) 9px;
+      border: 0;
+      border-radius: 4px;
+      color: #ffffff;
+      background: #315d4d;
+      font-size: clamp(8px, 0.88vw, 11px);
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .demo-table {
+      border-top: 1px solid #d5dad3;
+    }
+
+    .demo-row {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr 0.7fr;
+      gap: 12px;
+      align-items: center;
+      min-height: clamp(23px, 3vw, 38px);
+      border-bottom: 1px solid #dfe3dc;
+    }
+
+    .demo-cell {
+      height: 5px;
+      border-radius: 3px;
+      background: #c8cec6;
+    }
+
+    .demo-cell.short { width: 54%; }
+
+    .zoom-focus {
+      position: absolute;
+      top: 7px;
+      right: 8px;
+      width: clamp(112px, 14vw, 174px);
+      height: clamp(42px, 5.4vw, 68px);
+      border: 2px solid var(--accent);
+      border-radius: 5px;
+      pointer-events: none;
+      animation: focus-pulse 2.8s var(--ease) infinite;
+    }
+
+    .zoom-focus span {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      color: #ffffff;
+      background: var(--accent);
+      font: clamp(7px, 0.8vw, 10px)/1 var(--mono);
+      white-space: nowrap;
+    }
+
+    .demo-pointer {
+      position: absolute;
+      top: 37px;
+      right: 59px;
+      width: 8px;
+      height: 8px;
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(115, 88, 232, 0.2);
+    }
+
+    .demo-callout {
+      position: absolute;
+      left: 50%;
+      bottom: clamp(35px, 5.5vw, 70px);
       z-index: 2;
+      max-width: 72%;
+      padding: 6px 9px;
+      border-radius: 5px;
+      color: #ffffff;
+      background: rgba(17, 19, 15, 0.9);
+      font-size: clamp(8px, 0.95vw, 12px);
+      font-weight: 650;
+      text-align: center;
+      transform: translateX(-50%);
+      animation: callout-in 4.8s var(--ease) infinite;
+    }
+
+    .demo-timeline {
+      position: absolute;
       left: 0;
       right: 0;
-      bottom: 28px;
-      height: 1px;
-      overflow: hidden;
-      background: var(--line);
+      bottom: 0;
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      align-items: center;
+      height: clamp(29px, 4.2vw, 54px);
+      color: #9da39a;
+      background: #171a16;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font: clamp(6px, 0.72vw, 9px)/1 var(--mono);
     }
 
-    .signal-line::after {
+    .timeline-labels {
+      display: grid;
+      gap: 6px;
+      padding-left: 8px;
+    }
+
+    .timeline-tracks {
+      position: relative;
+      display: grid;
+      gap: 4px;
+      padding-right: 9px;
+    }
+
+    .timeline-track {
+      position: relative;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+
+    .timeline-event {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-radius: 3px;
+    }
+
+    .timeline-event.zoom { left: 28%; width: 24%; background: var(--accent); }
+    .timeline-event.text { left: 54%; width: 29%; background: #d3a45e; }
+
+    .timeline-head {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      left: 46%;
+      width: 1px;
+      background: #ffffff;
+      animation: head-move 6.5s var(--ease) infinite;
+    }
+
+    .engine-strip {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: center;
+      min-height: 64px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    .engine-copy strong { color: var(--ink); font-weight: 650; }
+
+    .engine-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font: 10px/1.3 var(--mono);
+    }
+
+    .engine-state::before {
       content: "";
-      display: block;
-      width: 22%;
-      height: 1px;
-      background: var(--accent-deep);
-      transform: translateX(-100%);
-      animation: scan 5.8s var(--ease) infinite;
+      width: 7px;
+      height: 7px;
+      border: 1px solid #64685f;
+      border-radius: 50%;
+      animation: pulse 1.4s var(--ease) infinite;
+    }
+
+    .engine-state[data-state="ready"] { color: #9ad1ac; }
+    .engine-state[data-state="ready"]::before { background: currentColor; border-color: currentColor; }
+    .engine-state[data-state="error"] { color: #d88779; }
+    .engine-state[data-state="error"]::before { border-color: currentColor; animation: none; }
+
+    .paper-section {
+      color: var(--paper-ink);
+      background: var(--paper);
     }
 
     .section {
-      padding-block: clamp(64px, 7vw, 108px);
-      border-bottom: 1px solid var(--line);
+      padding-block: clamp(82px, 10vw, 142px);
     }
 
-    .section-head {
+    .section-heading {
       display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr);
+      grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+      gap: clamp(40px, 8vw, 110px);
       align-items: end;
-      gap: 50px;
-      margin-bottom: 64px;
+      margin-bottom: clamp(56px, 8vw, 96px);
     }
 
-    .section-kicker {
+    .kicker {
       display: block;
-      margin-bottom: 18px;
-      color: var(--faint);
-      font: 700 11px/1 var(--mono);
+      margin-bottom: 16px;
+      color: #6652c3;
+      font: 700 10px/1 var(--mono);
       text-transform: uppercase;
     }
 
     h2 {
       max-width: 12ch;
       margin: 0;
-      font-size: clamp(36px, 5vw, 68px);
+      font-size: clamp(36px, 5vw, 66px);
       line-height: 0.98;
-      letter-spacing: -0.035em;
-      font-weight: 620;
+      letter-spacing: -0.04em;
+      font-weight: 640;
       text-wrap: balance;
     }
 
-    .section-head p {
-      max-width: 50ch;
+    .section-heading p {
+      max-width: 48ch;
       margin: 0;
-      color: var(--muted);
+      color: var(--paper-muted);
       font-size: 15px;
       line-height: 1.7;
     }
 
     .tool-row {
       display: grid;
-      grid-template-columns: 72px minmax(240px, 1fr) minmax(300px, 1.3fr) auto;
+      grid-template-columns: 54px minmax(230px, 0.9fr) minmax(300px, 1.1fr) auto;
       gap: 28px;
       align-items: center;
-      padding: 28px 0 34px;
-      border-top: 1px solid var(--ink);
-      border-bottom: 1px solid var(--line);
+      padding: 30px 0 36px;
+      border-top: 1px solid var(--paper-ink);
+      border-bottom: 1px solid var(--paper-line);
+      color: var(--paper-ink);
       text-decoration: none;
-      transition: padding 300ms var(--ease), background 300ms var(--ease);
+      transition: padding 260ms var(--ease), background 260ms var(--ease);
     }
 
     .tool-row:hover {
-      padding-inline: 16px;
-      background: rgba(190, 212, 94, 0.12);
+      padding-inline: 14px;
+      background: rgba(115, 88, 232, 0.07);
     }
 
-    .tool-number {
-      color: var(--faint);
-      font: 12px/1 var(--mono);
-    }
+    .tool-number { color: #91958b; font: 11px/1 var(--mono); }
 
     .tool-name {
       display: block;
-      font-size: clamp(22px, 2.5vw, 34px);
-      line-height: 1.05;
-      letter-spacing: -0.025em;
-      font-weight: 650;
+      font-size: clamp(24px, 2.4vw, 34px);
+      line-height: 1;
+      letter-spacing: -0.03em;
+      font-weight: 670;
     }
 
-    .tool-state {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      margin-top: 10px;
-      color: var(--accent-deep);
-      font: 11px/1 var(--mono);
+    .tool-status {
+      display: block;
+      margin-top: 9px;
+      color: #6652c3;
+      font: 10px/1 var(--mono);
       text-transform: uppercase;
     }
 
-    .tool-state::before {
-      content: "";
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: currentColor;
-    }
-
     .tool-description {
-      max-width: 53ch;
-      color: var(--muted);
+      max-width: 52ch;
+      color: var(--paper-muted);
       font-size: 14px;
       line-height: 1.65;
     }
 
-    .tool-link {
-      min-width: 118px;
-      text-align: right;
-      font-size: 13px;
-      font-weight: 700;
+    .tool-open { font-size: 13px; font-weight: 750; }
+
+    .editor-proof {
+      margin: clamp(58px, 7vw, 90px) 0 0;
     }
 
-    .workflow {
+    .editor-proof-frame {
+      padding: clamp(14px, 2.4vw, 28px);
+      border: 1px solid var(--paper-line);
+      border-radius: 8px;
+      background: #e2e4dc;
+    }
+
+    .editor-proof img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border: 1px solid #bbbfb5;
+      border-radius: 6px;
+      box-shadow: 0 28px 70px -46px rgba(38, 43, 34, 0.45);
+    }
+
+    .editor-proof figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      margin-top: 13px;
+      color: var(--paper-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .features {
       display: grid;
-      grid-template-columns: minmax(0, 0.76fr) minmax(0, 1.24fr);
-      gap: clamp(50px, 10vw, 150px);
+      grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+      gap: clamp(50px, 10vw, 140px);
       align-items: start;
+      margin-top: clamp(80px, 10vw, 130px);
     }
 
-    .workflow-title {
-      position: sticky;
-      top: 36px;
-    }
+    .features h2 { position: sticky; top: 36px; }
+    .feature-list { border-top: 1px solid var(--paper-ink); }
 
-    .workflow-title h2 { max-width: 9ch; }
-
-    .steps { border-top: 1px solid var(--ink); }
-
-    .step {
+    .feature {
       display: grid;
-      grid-template-columns: 52px minmax(0, 1fr);
-      gap: 20px;
-      padding: 30px 0 36px;
-      border-bottom: 1px solid var(--line);
+      grid-template-columns: 40px minmax(0, 1fr);
+      gap: 18px;
+      padding: 28px 0 34px;
+      border-bottom: 1px solid var(--paper-line);
     }
 
-    .step-index {
-      color: var(--faint);
-      font: 11px/1.5 var(--mono);
-    }
+    .feature-index { color: #93978d; font: 10px/1.5 var(--mono); }
 
-    .step h3 {
+    .feature h3 {
       margin: 0;
-      font-size: 20px;
-      line-height: 1.2;
+      font-size: 19px;
       font-weight: 650;
     }
 
-    .step p {
-      max-width: 56ch;
-      margin: 10px 0 0;
-      color: var(--muted);
+    .feature p {
+      grid-column: 2;
+      max-width: 55ch;
+      margin: -7px 0 0;
+      color: var(--paper-muted);
       font-size: 14px;
       line-height: 1.65;
     }
 
-    .system-strip {
+    .final-cta {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 28px;
-      align-items: center;
-      padding: 24px 0;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 40px;
+      align-items: end;
+      padding-block: clamp(86px, 10vw, 140px);
     }
 
-    .system-copy strong {
-      display: block;
-      font-size: 14px;
-    }
-
-    .system-copy span {
-      display: block;
-      margin-top: 5px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .capability-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 220px;
-      justify-content: flex-end;
-      color: var(--muted);
-      font: 11px/1.4 var(--mono);
-    }
-
-    .capability-status::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border: 1px solid var(--faint);
-      border-radius: 50%;
-      animation: breathe 1.4s var(--ease) infinite;
-    }
-
-    .capability-status[data-state="ready"] { color: var(--accent-deep); }
-    .capability-status[data-state="ready"]::before { background: currentColor; border-color: currentColor; }
-    .capability-status[data-state="error"] { color: #9b4d42; }
-    .capability-status[data-state="error"]::before { border-color: currentColor; animation: none; }
+    .final-cta h2 { max-width: 12ch; }
 
     footer {
       display: flex;
       justify-content: space-between;
       gap: 30px;
-      padding-block: 38px 48px;
+      padding-block: 30px 40px;
       color: var(--muted);
+      border-top: 1px solid var(--line);
       font-size: 12px;
     }
 
@@ -503,72 +706,83 @@
 
     .reveal {
       opacity: 0;
-      transform: translate3d(0, 18px, 0);
+      transform: translate3d(0, 16px, 0);
       animation: reveal 760ms var(--ease) forwards;
     }
 
-    .reveal:nth-child(2) { animation-delay: 90ms; }
-    .reveal:nth-child(3) { animation-delay: 180ms; }
-    .reveal:nth-child(4) { animation-delay: 270ms; }
+    .reveal-delay { animation-delay: 110ms; }
 
     @keyframes reveal {
       to { opacity: 1; transform: translate3d(0, 0, 0); }
     }
 
-    @keyframes media-in {
-      from { opacity: 0; transform: perspective(1600px) rotateY(-6deg) rotateZ(1deg) translate3d(45px, 0, 0); }
-      to { opacity: 1; transform: perspective(1600px) rotateY(-2deg) rotateZ(0.4deg) translate3d(0, 0, 0); }
+    @keyframes mark-breathe {
+      0%, 100% { opacity: 0.78; transform: scale(0.96); }
+      50% { opacity: 1; transform: scale(1); }
     }
 
-    @keyframes scan {
-      0%, 12% { transform: translateX(-100%); }
-      70%, 100% { transform: translateX(560%); }
+    @keyframes window-float {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      50% { transform: translate3d(0, -4px, 0); }
     }
 
-    @keyframes breathe {
-      0%, 100% { opacity: 0.45; transform: scale(0.86); }
+    @keyframes timeline {
+      0%, 10% { transform: translateX(-100%); }
+      72%, 100% { transform: translateX(400%); }
+    }
+
+    @keyframes focus-pulse {
+      0%, 100% { opacity: 0.72; transform: scale(0.97); }
+      50% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes callout-in {
+      0%, 14%, 100% { opacity: 0; transform: translate3d(-50%, 6px, 0); }
+      30%, 82% { opacity: 1; transform: translate3d(-50%, 0, 0); }
+    }
+
+    @keyframes head-move {
+      0%, 10% { transform: translateX(-180px); }
+      72%, 100% { transform: translateX(180px); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.45; transform: scale(0.84); }
       50% { opacity: 1; transform: scale(1); }
     }
 
     @media (max-width: 900px) {
-      .topbar { grid-template-columns: 1fr auto; }
-      .topnav { display: none; }
-      .hero { min-height: calc(100dvh - 180px); align-items: start; }
-      .hero-copy { width: min(590px, 88%); padding-top: 64px; }
-      .hero-media {
-        top: auto;
-        left: 12vw;
-        right: -34vw;
-        bottom: 52px;
-        width: auto;
-        height: 43%;
-        transform: none;
-      }
-      .hero-media::before { background: linear-gradient(180deg, var(--paper) 0%, transparent 42%); }
-      .section-head { grid-template-columns: 1fr; gap: 26px; }
-      .tool-row { grid-template-columns: 48px minmax(0, 1fr) auto; }
+      .nav { grid-template-columns: 1fr auto; }
+      .nav-links { display: none; }
+      .section-heading { grid-template-columns: 1fr; gap: 28px; }
+      .tool-row { grid-template-columns: 42px minmax(0, 1fr) auto; }
       .tool-description { grid-column: 2 / -1; }
-      .workflow { grid-template-columns: 1fr; gap: 48px; }
-      .workflow-title { position: static; }
+      .features { grid-template-columns: 1fr; gap: 42px; }
+      .features h2 { position: static; }
     }
 
     @media (max-width: 620px) {
       .shell { padding-inline: 18px; }
-      .topbar { min-height: 64px; }
-      .availability span:last-child { display: none; }
-      .hero { min-height: calc(100dvh - 180px); }
-      .hero-copy { width: 100%; padding: 52px 0 32px; }
-      h1 { font-size: clamp(50px, 17vw, 72px); }
-      .hero-copy > p { max-width: 35ch; margin-top: 24px; font-size: 16px; }
-      .hero-actions { align-items: stretch; flex-direction: column; width: min(280px, 100%); margin-top: 28px; }
-      .hero-media { left: 18px; right: -76vw; bottom: 48px; height: 36%; }
-      .section { padding-block: 72px; }
-      .section-head { margin-bottom: 42px; }
-      .tool-row { grid-template-columns: 36px minmax(0, 1fr); gap: 18px; }
-      .tool-description, .tool-link { grid-column: 2; }
-      .tool-link { min-width: 0; text-align: left; }
-      .system-strip { grid-template-columns: 1fr; }
-      .capability-status { justify-content: flex-start; }
+      .nav { min-height: 62px; }
+      .nav-action { min-height: 34px; padding-inline: 11px; }
+      .hero { min-height: 0; padding: 34px 0 40px; }
+      .focus-mark { width: 50px; height: 50px; border-width: 7px; margin-bottom: 14px; }
+      .hero-badge { margin-bottom: 15px; }
+      h1 { font-size: clamp(43px, 12.8vw, 55px); }
+      .hero-copy { max-width: 34ch; font-size: 15px; }
+      .hero-actions { flex-direction: column; width: min(280px, 100%); margin-inline: auto; }
+      .button { width: 100%; }
+      .showcase-wrap { width: calc(100% - 20px); aspect-ratio: 16 / 10; margin-top: 42px; padding: 14px; }
+      .showcase-window { width: 100%; margin-inline: auto; }
+      .engine-strip { min-height: 62px; }
+      .engine-state { max-width: 150px; text-align: right; }
+      .section { padding-block: 76px; }
+      .section-heading { margin-bottom: 48px; }
+      .tool-row { grid-template-columns: 32px minmax(0, 1fr); gap: 16px; }
+      .tool-description, .tool-open { grid-column: 2; }
+      .features { margin-top: 80px; }
+      .editor-proof figcaption { flex-direction: column; gap: 4px; }
+      .final-cta { grid-template-columns: 1fr; align-items: start; }
       footer { flex-direction: column; }
     }
 
@@ -585,96 +799,139 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <header class="shell topbar">
-    <a class="wordmark" href="/" aria-label="Video Tools home">
-      <span class="wordmark-mark" aria-hidden="true"></span>
+  <header class="shell nav">
+    <a class="brand" href="/" aria-label="Video Tools home">
+      <span class="brand-mark" aria-hidden="true"></span>
       <span>Video Tools</span>
     </a>
-    <nav class="topnav" aria-label="Primary navigation">
-      <a href="#tools">Tools</a>
-      <a href="#workflow">Workflow</a>
+    <nav class="nav-links" aria-label="Primary navigation">
+      <a href="#product">Product</a>
+      <a href="#features">Features</a>
       <a href="https://github.com/phuongtruong-agilityio/video-tools">Source</a>
     </nav>
-    <div class="availability">
-      <span class="status-dot" aria-hidden="true"></span>
-      <span>01 tool online</span>
-    </div>
+    <a class="nav-action" href="/tools/video-zoom-editor">Open editor</a>
   </header>
 
   <main id="main">
     <section class="shell hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="eyebrow reveal">Local video workspace</p>
-        <h1 id="hero-title" class="reveal">Video Tools</h1>
-        <p class="reveal">Shape screen recordings after the capture. Add focus, place context, and export a clean MP4 without sending your footage to a cloud service.</p>
-        <div class="hero-actions reveal">
-          <a class="button" href="/tools/video-zoom-editor">Open Zoom Editor</a>
-          <a class="button secondary" href="#tools">Browse tools</a>
+      <div class="focus-mark reveal" aria-hidden="true"></div>
+      <div class="hero-badge reveal">Local editor for screen recordings</div>
+      <h1 id="hero-title" class="reveal">Clear screen recordings in minutes</h1>
+      <p class="hero-copy reveal reveal-delay">Add smooth manual zooms and text to any QuickTime, OBS, or Loom recording. Preview the result, then export an MP4 locally.</p>
+      <div class="hero-actions reveal reveal-delay">
+        <a class="button" href="/tools/video-zoom-editor">Open Video Zoom Editor</a>
+        <a class="button secondary" href="#product">See what it does</a>
+      </div>
+      <div class="showcase-wrap" aria-label="Video Zoom Editor preview">
+        <div class="showcase-window">
+          <div class="demo-browser">
+            <div class="demo-browserbar">
+              <span class="demo-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+              <span class="demo-address">app.local/releases</span>
+              <span>Demo project</span>
+            </div>
+            <div class="demo-body">
+              <aside class="demo-sidebar" aria-hidden="true">
+                <strong>Northstar</strong>
+                <div class="demo-navline active"></div>
+                <div class="demo-navline"></div>
+                <div class="demo-navline"></div>
+              </aside>
+              <div class="demo-main">
+                <div class="demo-mainhead">
+                  <div class="demo-title">
+                    <strong>Release checklist</strong>
+                    <span>12 items / 10 complete</span>
+                  </div>
+                  <div class="demo-action">Publish update</div>
+                </div>
+                <div class="demo-table" aria-hidden="true">
+                  <div class="demo-row"><span class="demo-cell"></span><span class="demo-cell short"></span><span class="demo-cell"></span></div>
+                  <div class="demo-row"><span class="demo-cell"></span><span class="demo-cell"></span><span class="demo-cell short"></span></div>
+                  <div class="demo-row"><span class="demo-cell short"></span><span class="demo-cell"></span><span class="demo-cell"></span></div>
+                </div>
+                <div class="zoom-focus"><span>ZOOM 1.8x</span></div>
+                <div class="demo-pointer" aria-hidden="true"></div>
+              </div>
+            </div>
+            <div class="demo-callout">Click Publish when the review is complete</div>
+            <div class="demo-timeline" aria-label="Timeline showing zoom and text edits">
+              <div class="timeline-labels"><span>ZOOM</span><span>TEXT</span></div>
+              <div class="timeline-tracks">
+                <div class="timeline-track"><span class="timeline-event zoom"></span></div>
+                <div class="timeline-track"><span class="timeline-event text"></span></div>
+                <span class="timeline-head" aria-hidden="true"></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <div class="hero-media">
-        <img src="/assets/video-zoom-editor-preview.jpg" alt="Video Zoom Editor interface with the video stage, timeline, and inspector" />
-      </div>
-      <div class="signal-line" aria-hidden="true"></div>
     </section>
 
-    <section class="shell section" id="tools" aria-labelledby="tools-title">
-      <div class="section-head">
-        <div>
-          <span class="section-kicker">Tool index / 01</span>
-          <h2 id="tools-title">Built for the edit after record.</h2>
+    <section class="shell engine-strip" aria-live="polite">
+      <div class="engine-copy"><strong>Video Zoom Editor</strong> / available now</div>
+      <span class="engine-state" id="engineState" data-state="loading">Checking render engine</span>
+    </section>
+
+    <section class="paper-section" id="product" aria-labelledby="product-title">
+      <div class="shell section">
+        <div class="section-heading">
+          <div>
+            <span class="kicker">One focused tool</span>
+            <h2 id="product-title">The edit after you stop recording.</h2>
+          </div>
+          <p>Keep recording however you already do. Video Tools starts when the file is ready and gives you only the controls needed to guide attention.</p>
         </div>
-        <p>The collection starts focused: one complete tool for the most common screen-recording cleanup. New utilities can join the same local workflow without turning the suite into a heavy desktop app.</p>
-      </div>
 
-      <a class="tool-row" href="/tools/video-zoom-editor">
-        <span class="tool-number">01</span>
-        <span>
-          <span class="tool-name">Video Zoom Editor</span>
-          <span class="tool-state">Available</span>
-        </span>
-        <span class="tool-description">Import QuickTime, OBS, or Loom recordings. Place smooth zooms and text at exact moments, preview the timing, then export H.264 MP4 locally.</span>
-        <span class="tool-link">Open tool</span>
-      </a>
+        <a class="tool-row" href="/tools/video-zoom-editor">
+          <span class="tool-number">01</span>
+          <span>
+            <span class="tool-name">Video Zoom Editor</span>
+            <span class="tool-status">Available / Local</span>
+          </span>
+          <span class="tool-description">Manual zooms, draggable text overlays, realtime preview, and H.264 MP4 export for recordings from any source.</span>
+          <span class="tool-open">Open tool</span>
+        </a>
+
+        <figure class="editor-proof">
+          <div class="editor-proof-frame">
+            <img src="/assets/video-zoom-editor-preview.jpg" alt="Full Video Zoom Editor interface with upload stage, timeline, and inspector" />
+          </div>
+          <figcaption>
+            <span>The actual local editor interface</span>
+            <span>Preview / timeline / inspector / export</span>
+          </figcaption>
+        </figure>
+
+        <div class="features" id="features">
+          <h2>Simple controls. Polished result.</h2>
+          <div class="feature-list">
+            <article class="feature">
+              <span class="feature-index">01</span>
+              <h3>Zoom exactly where the action is</h3>
+              <p>Move the playhead, choose Zoom, and click the target. The editor handles the smooth ease-in and ease-out.</p>
+            </article>
+            <article class="feature">
+              <span class="feature-index">02</span>
+              <h3>Put context directly on screen</h3>
+              <p>Add text at any moment, type in the inspector, and drag the label on the preview to refine its position.</p>
+            </article>
+            <article class="feature">
+              <span class="feature-index">03</span>
+              <h3>Render without sending footage away</h3>
+              <p>The local server uses ffmpeg to create a portable H.264 MP4 with AAC audio and fast-start enabled.</p>
+            </article>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="shell section workflow" id="workflow" aria-labelledby="workflow-title">
-      <div class="workflow-title">
-        <span class="section-kicker">Local-first workflow</span>
-        <h2 id="workflow-title">From raw capture to focused cut.</h2>
+    <section class="shell final-cta">
+      <div>
+        <span class="kicker">Start with the file you have</span>
+        <h2>Make the next recording easier to follow.</h2>
       </div>
-      <div class="steps">
-        <article class="step">
-          <span class="step-index">01</span>
-          <div>
-            <h3>Open any screen recording</h3>
-            <p>Use `.mov` or `.mp4` from QuickTime, OBS, Loom, or another recorder. Preview and editing happen in your browser on this machine.</p>
-          </div>
-        </article>
-        <article class="step">
-          <span class="step-index">02</span>
-          <div>
-            <h3>Place attention deliberately</h3>
-            <p>Move the playhead, choose Zoom or Text, then click the exact location in the video. Drag text directly to refine its position.</p>
-          </div>
-        </article>
-        <article class="step">
-          <span class="step-index">03</span>
-          <div>
-            <h3>Render a portable MP4</h3>
-            <p>The local server uses ffmpeg for H.264 video and AAC audio, with fast-start enabled for reliable sharing and playback.</p>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="shell system-strip" aria-live="polite">
-      <div class="system-copy">
-        <strong>Render engine</strong>
-        <span>Capabilities are checked against this machine.</span>
-      </div>
-      <div class="capability-status" id="capabilityStatus" data-state="loading">Checking ffmpeg and text rendering</div>
+      <a class="button" href="/tools/video-zoom-editor">Open Video Zoom Editor</a>
     </section>
   </main>
 
@@ -684,23 +941,23 @@
   </footer>
 
   <script>
-    const capabilityStatus = document.getElementById('capabilityStatus');
+    const engineState = document.getElementById('engineState');
 
     fetch('/api/capabilities')
       .then((response) => {
-        if (!response.ok) throw new Error('Capability check failed');
+        if (!response.ok) throw new Error('Render engine unavailable');
         return response.json();
       })
       .then((capabilities) => {
-        if (!capabilities.videoRendering) throw new Error('ffmpeg or ffprobe is unavailable');
-        capabilityStatus.dataset.state = 'ready';
-        capabilityStatus.textContent = capabilities.textRendering
-          ? 'Ready / video + text rendering available'
-          : 'Ready / video rendering only';
+        if (!capabilities.videoRendering) throw new Error('ffmpeg or ffprobe missing');
+        engineState.dataset.state = 'ready';
+        engineState.textContent = capabilities.textRendering
+          ? 'Render engine ready'
+          : 'Video rendering ready';
       })
       .catch((error) => {
-        capabilityStatus.dataset.state = 'error';
-        capabilityStatus.textContent = error.message;
+        engineState.dataset.state = 'error';
+        engineState.textContent = error.message;
       });
   </script>
 </body>
