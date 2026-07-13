@@ -396,6 +396,37 @@
     .zoom-target::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
     .zoom-target::after { right: -1px; bottom: -1px; border-left: 0; border-top: 0; }
 
+    .zoom-mag {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translate(-50%, -5px);
+      padding: 2px 5px;
+      border-radius: 3px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font: 700 9px/1 var(--mono);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    /* viewfinder registration marks framing the preview (echoes the hero) */
+    .surface-frame {
+      position: absolute;
+      inset: 8px;
+      pointer-events: none;
+    }
+    .surface-frame span {
+      position: absolute;
+      width: 13px;
+      height: 13px;
+      border: 1.5px solid rgba(244, 246, 250, 0.28);
+    }
+    .surface-frame span:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+    .surface-frame span:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+    .surface-frame span:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+    .surface-frame span:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+
     .transport {
       display: grid;
       grid-template-columns: auto auto auto minmax(0, 1fr) auto;
@@ -752,6 +783,7 @@
             <div class="video-layer" id="videoLayer">
               <video id="video" playsinline></video>
             </div>
+            <div class="surface-frame" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
             <div class="text-layer" id="textLayer"></div>
             <div id="zoomTargets"></div>
           </div>
@@ -1020,6 +1052,20 @@
       setMode('idle');
       setStatus('Zoom added. Select it on the timeline to adjust it.', 'ok');
       updateUI();
+
+      // acquire: the fresh reticle snaps onto the target (echoes the hero)
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const marker = els.zoomTargets.querySelector(`[data-zoom-id="${zoom.id}"]`);
+        if (marker) {
+          marker.animate(
+            [
+              { transform: 'scale(2.4)', opacity: 0 },
+              { transform: 'scale(1)', opacity: 1 },
+            ],
+            { duration: 440, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+          );
+        }
+      }
     }
 
     function addText(point) {
@@ -1144,7 +1190,9 @@
 
     function renderPreviewOverlays() {
       els.zoomTargets.innerHTML = state.zooms.map((zoom) => `
-        <span class="zoom-target" style="left:${zoom.x * 100}%; top:${zoom.y * 100}%"></span>
+        <span class="zoom-target" style="left:${zoom.x * 100}%; top:${zoom.y * 100}%" data-zoom-id="${zoom.id}">
+          <span class="zoom-mag">${magLabel(zoom.scale)}×</span>
+        </span>
       `).join('');
       renderActiveTexts();
     }
@@ -1479,6 +1527,10 @@
 
     function roundRatio(value) {
       return Math.round(Number(value || 0) * 1000) / 1000;
+    }
+
+    function magLabel(scale) {
+      return String(Math.round((Number(scale) || 1) * 10) / 10);
     }
 
     function clamp(value, min, max) {
