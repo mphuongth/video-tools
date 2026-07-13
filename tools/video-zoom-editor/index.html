@@ -1053,16 +1053,20 @@
       setStatus('Zoom added. Select it on the timeline to adjust it.', 'ok');
       updateUI();
 
-      // acquire: the fresh reticle snaps onto the target (echoes the hero)
+      // acquire: a large focus bracket blooms out, then locks onto the target
+      // (echoes the hero). Animate width/height so the corner ticks stay 2px
+      // crisp rather than getting fattened by a transform scale.
       if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         const marker = els.zoomTargets.querySelector(`[data-zoom-id="${zoom.id}"]`);
         if (marker) {
           marker.animate(
             [
-              { transform: 'scale(2.4)', opacity: 0 },
-              { transform: 'scale(1)', opacity: 1 },
+              { width: '20px', height: '20px', marginLeft: '-10px', marginTop: '-10px', opacity: 0, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+              { width: '160px', height: '160px', marginLeft: '-80px', marginTop: '-80px', opacity: 1, offset: 0.4 },
+              { width: '160px', height: '160px', marginLeft: '-80px', marginTop: '-80px', opacity: 1, offset: 0.62, easing: 'cubic-bezier(0.7, 0, 0.3, 1)' },
+              { width: '26px', height: '26px', marginLeft: '-13px', marginTop: '-13px', opacity: 1 },
             ],
-            { duration: 440, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+            { duration: 720 },
           );
         }
       }
