@@ -703,6 +703,14 @@
       .transport .tool-button { grid-row: 2; }
       .field-grid { grid-template-columns: 1fr; }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -964,7 +972,7 @@
         }
       }
 
-      if (options.pulse && state.file) {
+      if (options.pulse && state.file && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         els.surface.animate(
           [
             { outlineColor: 'rgba(255, 106, 61, 0.1)' },
