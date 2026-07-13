@@ -4,22 +4,22 @@ import { createServer } from 'node:http';
 import { execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { createCanvas } from '@napi-rs/canvas';
 
 const execFile = promisify(execFileCb);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const HOST = process.env.VIDEO_ZOOM_EDITOR_HOST || '127.0.0.1';
-const PORT = Number(process.env.VIDEO_ZOOM_EDITOR_PORT || 4320);
+// Honor the app's own env vars first; fall back to the platform PORT (Render,
+// Railway, Fly, …) and bind on all interfaces when running on such a host.
+const PORT = Number(process.env.VIDEO_ZOOM_EDITOR_PORT || process.env.PORT || 4320);
+const HOST = process.env.VIDEO_ZOOM_EDITOR_HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
 const INDEX_HTML_PATH = path.join(__dirname, 'index.html');
-const LANDING_HTML_PATH = path.resolve(__dirname, '../../landing.html');
+const LANDING_HTML_PATH = path.resolve(__dirname, '../../index.html');
 const PREVIEW_IMAGE_PATH = path.resolve(__dirname, '../../assets/video-zoom-editor-preview.jpg');
-const TEXT_RENDERER_SOURCE = path.join(__dirname, 'render-text.swift');
-const TEXT_RENDERER_BINARY = path.join(os.tmpdir(), 'video-zoom-editor-render-text');
-const SWIFT_MODULE_CACHE = path.join(os.tmpdir(), 'video-zoom-editor-swift-cache');
 
 class UserInputError extends Error {
   constructor(message) {
@@ -148,20 +148,19 @@ function parseProjectJson(rawProject) {
 }
 
 async function buildCapabilities() {
-  const [ffmpeg, ffprobe, drawtext, swiftc] = await Promise.all([
+  const [ffmpeg, ffprobe] = await Promise.all([
     isCommandAvailable('ffmpeg', ['-version']),
     isCommandAvailable('ffprobe', ['-version']),
-    hasFfmpegFilter('drawtext'),
-    isCommandAvailable('swiftc', ['--version']),
   ]);
 
   return {
     ffmpeg,
     ffprobe,
-    drawtext,
-    pngTextFallback: swiftc,
     videoRendering: ffmpeg && ffprobe,
-    textRendering: drawtext || swiftc,
+    // Text overlays are drawn in-process with @napi-rs/canvas, so text export
+    // works anywhere ffmpeg does — no drawtext filter or Swift toolchain needed.
+    textRendering: true,
+    pngTextFallback: true,
   };
 }
 
@@ -169,19 +168,6 @@ async function isCommandAvailable(command, args) {
   try {
     await execFile(command, args, { timeout: 5_000, maxBuffer: 256 * 1024 });
     return true;
-  } catch {
-    return false;
-  }
-}
-
-async function hasFfmpegFilter(filterName) {
-  try {
-    const { stdout, stderr } = await execFile('ffmpeg', ['-hide_banner', '-h', `filter=${filterName}`], {
-      timeout: 5_000,
-      maxBuffer: 256 * 1024,
-    });
-    const output = `${stdout}\n${stderr}`;
-    return output.includes(`Filter ${filterName}`) && !output.includes(`Unknown filter '${filterName}'`);
   } catch {
     return false;
   }
@@ -334,51 +320,76 @@ function assertTimeRange(event, label) {
   }
 }
 
+// Render a text overlay to a PNG: white semibold, centered and word-wrapped,
+// on a rounded translucent-dark chip — matching the on-screen .text-chip.
+// Drawn in-process so it runs on any OS ffmpeg runs on (no Swift/AppKit).
 async function renderTextOverlay(text, outputPath, videoWidth) {
-  await ensureTextRenderer();
-  const configPath = `${outputPath}.json`;
-  await writeFile(
-    configPath,
-    `${JSON.stringify(
-      {
-        outputPath,
-        text: text.text,
-        fontSize: text.fontSize,
-        maxWidth: Math.max(180, Math.min(980, videoWidth * 0.75)),
-      },
-      null,
-      2,
-    )}\n`,
-    'utf8',
-  );
+  const fontSize = clamp(Number(text.fontSize) || 42, 12, 120);
+  const maxWidth = clamp(Math.max(180, Math.min(980, videoWidth * 0.75)), 120, 1800);
+  const paddingX = Math.max(16, fontSize * 0.48);
+  const paddingY = Math.max(10, fontSize * 0.32);
+  const lineHeight = fontSize * 1.25;
+  const content = String(text.text || '').trim() || ' ';
+  const font = `600 ${fontSize}px sans-serif`;
 
-  await execFile(TEXT_RENDERER_BINARY, [configPath], {
-    timeout: 20_000,
-    maxBuffer: 1024 * 1024,
+  const measure = createCanvas(8, 8).getContext('2d');
+  measure.font = font;
+  const lines = wrapText(measure, content, maxWidth - paddingX * 2);
+  const textWidth = Math.max(1, ...lines.map((line) => measure.measureText(line).width));
+
+  const width = Math.max(1, Math.ceil(textWidth + paddingX * 2));
+  const height = Math.max(1, Math.ceil(lines.length * lineHeight + paddingY * 2));
+  const radius = Math.min(18, height / 3);
+
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(15, 15, 15, 0.78)';
+  roundedRectPath(ctx, 0, 0, width, height, radius);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = font;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  lines.forEach((line, index) => {
+    ctx.fillText(line, width / 2, paddingY + lineHeight * (index + 0.5));
   });
+
+  await writeFile(outputPath, canvas.toBuffer('image/png'));
 }
 
-async function ensureTextRenderer() {
-  await mkdir(SWIFT_MODULE_CACHE, { recursive: true });
-
-  let shouldCompile = true;
-  try {
-    const [sourceStat, binaryStat] = await Promise.all([stat(TEXT_RENDERER_SOURCE), stat(TEXT_RENDERER_BINARY)]);
-    shouldCompile = binaryStat.mtimeMs < sourceStat.mtimeMs;
-  } catch {
-    shouldCompile = true;
+function wrapText(ctx, content, maxWidth) {
+  const lines = [];
+  for (const rawLine of content.split('\n')) {
+    const words = rawLine.split(/\s+/).filter(Boolean);
+    if (!words.length) {
+      lines.push('');
+      continue;
+    }
+    let line = words[0];
+    for (let index = 1; index < words.length; index += 1) {
+      const candidate = `${line} ${words[index]}`;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        line = candidate;
+      } else {
+        lines.push(line);
+        line = words[index];
+      }
+    }
+    lines.push(line);
   }
+  return lines.length ? lines : [' '];
+}
 
-  if (!shouldCompile) return;
-
-  await execFile(
-    'swiftc',
-    ['-module-cache-path', SWIFT_MODULE_CACHE, TEXT_RENDERER_SOURCE, '-o', TEXT_RENDERER_BINARY],
-    {
-      timeout: 60_000,
-      maxBuffer: 8 * 1024 * 1024,
-    },
-  );
+function roundedRectPath(ctx, x, y, width, height, radius) {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
 }
 
 function buildFfmpegArgs(inputPath, outputPath, project, textInputs, metadata) {
