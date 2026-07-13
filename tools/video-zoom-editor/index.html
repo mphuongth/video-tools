@@ -750,7 +750,7 @@
       <div class="brand">
         <div class="brand-title">
           <span class="brand-mark" aria-hidden="true"></span>
-          <a class="back-link" href="/">Video Tools</a>
+          <a class="back-link" href="../../">Video Tools</a>
           <span class="brand-separator" aria-hidden="true">/</span>
           <h1>Video Zoom Editor</h1>
         </div>
@@ -947,6 +947,7 @@
     async function loadCapabilities() {
       try {
         const response = await fetch('/api/capabilities');
+        if (!response.ok) throw new Error('no render server');
         state.capabilities = await response.json();
         const textMode = state.capabilities.textRendering
           ? state.capabilities.drawtext
@@ -955,7 +956,9 @@
           : 'text export unavailable';
         setStatus(`Ready. ffmpeg: ${yesNo(state.capabilities.ffmpeg)}, ffprobe: ${yesNo(state.capabilities.ffprobe)}, text: ${textMode}.`, 'ok');
       } catch (error) {
-        setStatus(`Could not read capabilities: ${error.message}`, 'error');
+        // Hosted preview with no local render server: editing works, export doesn't.
+        state.capabilities = null;
+        setStatus('Live preview — run "pnpm video-zoom-editor" locally to export an MP4.', '');
       }
       updateUI();
     }
