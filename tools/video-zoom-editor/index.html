@@ -1108,10 +1108,27 @@
       els.videoLayer.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${zoom})`;
     }
 
+    let renderedTextKey = '';
+
     function renderActiveTexts() {
       if (!state.file) return;
       const current = els.video.currentTime || 0;
       const activeTexts = state.texts.filter((text) => current >= text.start && current <= text.end);
+
+      // tick() calls this every animation frame. During playback the active set
+      // and each chip's appearance stay constant, so skip the DOM rebuild unless
+      // something that affects the rendered chips actually changed.
+      const key = JSON.stringify(activeTexts.map((text) => [
+        text.id,
+        state.selected === text.id,
+        text.text.trim(),
+        text.x,
+        text.y,
+        text.fontSize,
+      ]));
+      if (key === renderedTextKey) return;
+      renderedTextKey = key;
+
       els.textLayer.innerHTML = activeTexts.map((text) => `
         <div
           class="text-chip ${state.selected === text.id ? 'selected' : ''} ${text.text.trim() ? '' : 'placeholder'}"
