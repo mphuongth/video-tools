@@ -674,21 +674,52 @@
     .render h2 { max-width: 15ch; }
     .render .sub { margin: 18px 0 0; max-width: 40ch; color: var(--muted); font-size: 15px; line-height: 1.6; }
     .render-actions { display: flex; flex-wrap: wrap; gap: 12px; }
-    .run-hint {
-      display: inline-block;
-      margin: 20px 0 0;
-      padding: 10px 14px;
-      color: var(--ink-dim);
+
+    /* ---- run strip (hosted demo only) ---- */
+    /* On the hosted demo the command is the actual next step, so it sits with the demo notice
+       rather than at the foot of the page. Running locally, there is nothing to install. */
+    .run-strip {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px 28px;
+      padding: 20px 0 24px;
+      border-bottom: 1px solid var(--hair);
+    }
+    .run-strip[hidden] { display: none; }
+    .run-strip p { margin: 0; max-width: 44ch; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .run-strip p code { color: var(--ink-dim); font: 500 12px var(--mono); }
+    .run-cmd {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 100%;
+      padding: 8px 8px 8px 14px;
       background: var(--surface);
       border: 1px solid var(--hair-strong);
       border-radius: 4px;
-      font: 500 12px/1.5 var(--mono);
-      letter-spacing: 0;
-      text-transform: none;
-      overflow-x: auto;
-      max-width: 100%;
     }
-    .run-hint[hidden] { display: none; }
+    .run-cmd code {
+      overflow-x: auto;
+      white-space: nowrap;
+      color: var(--ink-dim);
+      font: 500 12px/1.7 var(--mono);
+    }
+    .run-cmd button {
+      flex: none;
+      min-height: 30px;
+      padding: 0 12px;
+      color: var(--void);
+      background: var(--signal);
+      border: 0;
+      border-radius: 3px;
+      font: 650 12px var(--sans);
+      cursor: pointer;
+      transition: background 200ms var(--ease);
+    }
+    .run-cmd button:hover { background: var(--signal-hot); }
+    .run-cmd button:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
 
     footer {
       display: flex;
@@ -785,7 +816,7 @@
     <nav class="nav-links" aria-label="Primary">
       <a href="#tools">Tools</a>
       <a href="#workflow">Workflow</a>
-      <a href="https://github.com/phuongtruong-agilityio/video-tools">Source</a>
+      <a href="https://github.com/mphuongth/video-tools">GitHub</a>
     </nav>
     <a class="nav-action" href="#tools">Open a tool</a>
   </header>
@@ -861,6 +892,14 @@
     <section class="shell status-rail" aria-live="polite">
       <span id="railNote"><strong>Two tools</strong> — available now, running on this machine</span>
       <span class="engine-state" id="engineState" data-state="loading">Checking render engine</span>
+    </section>
+
+    <section class="shell run-strip" id="runStrip" hidden>
+      <p>Export and video compression run <code>ffmpeg</code> on your machine. Get both working in four commands.</p>
+      <div class="run-cmd">
+        <code id="runCommand">git clone https://github.com/mphuongth/video-tools &amp;&amp; cd video-tools &amp;&amp; pnpm install &amp;&amp; pnpm start</code>
+        <button id="runCopy" type="button">Copy</button>
+      </div>
     </section>
 
     <section class="band" id="tools" aria-labelledby="tools-title">
@@ -965,7 +1004,6 @@
         <p class="timecode code"><span class="crop" aria-hidden="true"></span>00:32 <span class="dim">/ ship</span></p>
         <h2>Make the next recording easier to follow.</h2>
         <p class="sub" id="renderSub">Start with the file you already have. Both tools open in the browser and run on this machine.</p>
-        <p class="run-hint" id="runHint" hidden>git clone https://github.com/mphuongth/video-tools &amp;&amp; pnpm install &amp;&amp; pnpm start</p>
       </div>
       <div class="render-actions">
         <a class="button" href="tools/video-zoom-editor/">
@@ -980,7 +1018,7 @@
 
   <footer class="shell">
     <span>Video Tools — local utility suite</span>
-    <a class="repo-link" href="https://github.com/phuongtruong-agilityio/video-tools">GitHub repository →</a>
+    <a class="repo-link" href="https://github.com/mphuongth/video-tools">GitHub repository →</a>
   </footer>
 
   <script>
@@ -989,7 +1027,9 @@
     const editorMeta = document.getElementById('editorMeta');
     const compressorMeta = document.getElementById('compressorMeta');
     const renderSub = document.getElementById('renderSub');
-    const runHint = document.getElementById('runHint');
+    const runStrip = document.getElementById('runStrip');
+    const runCommand = document.getElementById('runCommand');
+    const runCopy = document.getElementById('runCopy');
 
     // The page is served both from the local server and from GitHub Pages, where there is
     // no ffmpeg behind it. The markup states the local truth; this downgrades it to what
@@ -1002,8 +1042,18 @@
       compressorMeta.innerHTML = '<span class="warn">Gzip only</span> · Video needs local';
       renderSub.textContent =
         'Both tools open here, but ffmpeg runs on your machine — clone the repo to export and compress.';
-      runHint.hidden = false;
+      runStrip.hidden = false;
     }
+
+    runCopy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(runCommand.textContent);
+        runCopy.textContent = 'Copied';
+      } catch {
+        runCopy.textContent = 'Copy failed';
+      }
+      setTimeout(() => { runCopy.textContent = 'Copy'; }, 2000);
+    });
 
     fetch('api/capabilities')
       .then((response) => (response.ok ? response.json() : null))
