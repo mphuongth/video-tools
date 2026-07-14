@@ -958,7 +958,7 @@
       } catch (error) {
         // Hosted preview with no local render server: editing works, export doesn't.
         state.capabilities = null;
-        setStatus('Live preview — run "pnpm video-zoom-editor" locally to export an MP4.', '');
+        setStatus('Live demo — zoom and text work here. Clone the repo and run "pnpm start" to export an MP4.', '');
       }
       updateUI();
     }

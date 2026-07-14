@@ -576,6 +576,7 @@
       text-transform: uppercase;
     }
     .tool-meta .ok { color: var(--screen); }
+    .tool-meta .warn { color: var(--signal); }
     .tool-desc {
       max-width: 48ch;
       color: var(--muted);
@@ -673,6 +674,21 @@
     .render h2 { max-width: 15ch; }
     .render .sub { margin: 18px 0 0; max-width: 40ch; color: var(--muted); font-size: 15px; line-height: 1.6; }
     .render-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .run-hint {
+      display: inline-block;
+      margin: 20px 0 0;
+      padding: 10px 14px;
+      color: var(--ink-dim);
+      background: var(--surface);
+      border: 1px solid var(--hair-strong);
+      border-radius: 4px;
+      font: 500 12px/1.5 var(--mono);
+      letter-spacing: 0;
+      text-transform: none;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    .run-hint[hidden] { display: none; }
 
     footer {
       display: flex;
@@ -843,7 +859,7 @@
     </section>
 
     <section class="shell status-rail" aria-live="polite">
-      <span><strong>Two tools</strong> — available now, running on this machine</span>
+      <span id="railNote"><strong>Two tools</strong> — available now, running on this machine</span>
       <span class="engine-state" id="engineState" data-state="loading">Checking render engine</span>
     </section>
 
@@ -865,7 +881,7 @@
           <span class="crop" aria-hidden="true"></span>
           <span>
             <span class="tool-name">Video Zoom Editor</span>
-            <span class="tool-meta"><span class="ok">Available</span> · Local · Browser</span>
+            <span class="tool-meta" id="editorMeta"><span class="ok">Available</span> · Local · Browser</span>
           </span>
           <span class="tool-desc">
             Manual zooms, draggable text overlays, realtime preview, and H.264
@@ -878,7 +894,7 @@
           <span class="crop" aria-hidden="true"></span>
           <span>
             <span class="tool-name">File Compressor</span>
-            <span class="tool-meta"><span class="ok">Available</span> · Local · Browser</span>
+            <span class="tool-meta" id="compressorMeta"><span class="ok">Available</span> · Local · Browser</span>
           </span>
           <span class="tool-desc">
             Re-encodes a recording down to a target size, so it clears the 25 MiB
@@ -948,7 +964,8 @@
       <div>
         <p class="timecode code"><span class="crop" aria-hidden="true"></span>00:32 <span class="dim">/ ship</span></p>
         <h2>Make the next recording easier to follow.</h2>
-        <p class="sub">Start with the file you already have. Both tools open in the browser and run on this machine.</p>
+        <p class="sub" id="renderSub">Start with the file you already have. Both tools open in the browser and run on this machine.</p>
+        <p class="run-hint" id="runHint" hidden>git clone https://github.com/mphuongth/video-tools &amp;&amp; pnpm install &amp;&amp; pnpm start</p>
       </div>
       <div class="render-actions">
         <a class="button" href="tools/video-zoom-editor/">
@@ -968,14 +985,31 @@
 
   <script>
     const engineState = document.getElementById('engineState');
+    const railNote = document.getElementById('railNote');
+    const editorMeta = document.getElementById('editorMeta');
+    const compressorMeta = document.getElementById('compressorMeta');
+    const renderSub = document.getElementById('renderSub');
+    const runHint = document.getElementById('runHint');
+
+    // The page is served both from the local server and from GitHub Pages, where there is
+    // no ffmpeg behind it. The markup states the local truth; this downgrades it to what
+    // the hosted demo can actually do, so no tool is advertised as more than it is.
+    function showHostedDemo() {
+      engineState.dataset.state = 'idle';
+      engineState.textContent = 'No render engine here';
+      railNote.innerHTML = '<strong>Live demo</strong> — clone and run locally to export or compress video';
+      editorMeta.innerHTML = '<span class="warn">Try it</span> · Export needs local';
+      compressorMeta.innerHTML = '<span class="warn">Gzip only</span> · Video needs local';
+      renderSub.textContent =
+        'Both tools open here, but ffmpeg runs on your machine — clone the repo to export and compress.';
+      runHint.hidden = false;
+    }
 
     fetch('api/capabilities')
       .then((response) => (response.ok ? response.json() : null))
       .then((capabilities) => {
         if (!capabilities) {
-          // No local render server (e.g. the hosted preview) — degrade quietly.
-          engineState.dataset.state = 'idle';
-          engineState.textContent = 'Runs on your machine';
+          showHostedDemo();
           return;
         }
         if (!capabilities.videoRendering) {
@@ -988,10 +1022,7 @@
           ? 'Render engine ready'
           : 'Video rendering ready';
       })
-      .catch(() => {
-        engineState.dataset.state = 'idle';
-        engineState.textContent = 'Runs on your machine';
-      });
+      .catch(showHostedDemo);
   </script>
 </body>
 </html>

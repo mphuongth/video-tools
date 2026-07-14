@@ -505,7 +505,13 @@
         setStatus('CompressionStream is unavailable in this browser, so only videos can be compressed.', 'error');
       }
       loadCapabilities().catch(() => {
-        setStatus('Could not reach the local server.', 'error');
+        // Hosted demo with no local server: gzip still runs in the browser, video can't.
+        setStatus(
+          supportsGzip()
+            ? 'Live demo — non-video files still gzip here. Clone the repo and run "pnpm start" to compress video.'
+            : 'No local server, and this browser has no CompressionStream — nothing can be compressed here.',
+          supportsGzip() ? '' : 'error',
+        );
       });
 
       els.chooseButton.addEventListener('click', () => els.fileInput.click());
