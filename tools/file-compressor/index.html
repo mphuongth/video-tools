@@ -383,6 +383,30 @@
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .top-actions { flex-wrap: wrap; }
     }
+    /* Hosted demo: video needs ffmpeg on the user's machine, so hand over the command. */
+    .local-only {
+      width: min(540px, calc(100vw - 32px));
+      padding: 26px;
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.75);
+    }
+    .local-only::backdrop { background: rgba(6, 8, 12, 0.72); }
+    .local-only h2 { margin: 0 0 10px; font-size: 19px; font-weight: 640; letter-spacing: -0.01em; }
+    .local-only p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .local-only pre {
+      margin: 0;
+      padding: 14px;
+      overflow-x: auto;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font: 500 12px/1.7 var(--mono);
+    }
+    .local-only-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
   </style>
 </head>
 <body>
@@ -462,6 +486,23 @@
     </section>
   </main>
 
+  <dialog id="localOnly" class="local-only" aria-labelledby="localOnlyTitle">
+    <h2 id="localOnlyTitle">Video compression runs on your machine</h2>
+    <p>
+      This is the hosted demo, and there is no <code>ffmpeg</code> behind it. Non-video files still
+      compress here — they are gzipped in the browser — but re-encoding a video needs the local
+      server.
+    </p>
+    <pre id="localOnlyCommand">git clone https://github.com/mphuongth/video-tools
+cd video-tools
+pnpm install
+pnpm start</pre>
+    <div class="local-only-actions">
+      <button id="localOnlyCopy" type="button">Copy command</button>
+      <button id="localOnlyClose" class="primary" type="button">Got it</button>
+    </div>
+  </dialog>
+
   <script>
     const BYTES_PER_MIB = 1024 * 1024;
     const GIT_HARD_LIMIT_BYTES = 100 * BYTES_PER_MIB;
@@ -479,6 +520,7 @@
       isCompressing: false,
       targetBytes: 25 * BYTES_PER_MIB,
       capabilities: { loaded: false, videoTranscoding: false },
+      hosted: false,
     };
 
     const els = {
@@ -486,6 +528,10 @@
       chooseButton: document.getElementById('chooseButton'),
       clearButton: document.getElementById('clearButton'),
       compressButton: document.getElementById('compressButton'),
+      localOnly: document.getElementById('localOnly'),
+      localOnlyCommand: document.getElementById('localOnlyCommand'),
+      localOnlyCopy: document.getElementById('localOnlyCopy'),
+      localOnlyClose: document.getElementById('localOnlyClose'),
       dropzone: document.getElementById('dropzone'),
       fileName: document.getElementById('fileName'),
       targetSize: document.getElementById('targetSize'),
@@ -506,6 +552,7 @@
       }
       loadCapabilities().catch(() => {
         // Hosted demo with no local server: gzip still runs in the browser, video can't.
+        state.hosted = true;
         setStatus(
           supportsGzip()
             ? 'Live demo — non-video files still gzip here. Clone the repo and run "pnpm start" to compress video.'
@@ -543,6 +590,8 @@
       });
 
       els.compressButton.addEventListener('click', compressFiles);
+      els.localOnlyClose.addEventListener('click', () => els.localOnly.close());
+      els.localOnlyCopy.addEventListener('click', copyLocalOnlyCommand);
       els.clearButton.addEventListener('click', clearAll);
       els.targetSize.addEventListener('input', () => {
         state.targetBytes = Math.max(1, Number(els.targetSize.value || 25)) * BYTES_PER_MIB;
@@ -560,6 +609,7 @@
       if (!response.ok) throw new Error(payload.error || 'Failed to read capabilities');
 
       state.capabilities = { loaded: true, videoTranscoding: Boolean(payload.videoTranscoding) };
+      state.hosted = false;
       setStatus(
         payload.videoTranscoding
           ? `Ready. ffmpeg: ${yesNo(payload.ffmpeg)}, ffprobe: ${yesNo(payload.ffprobe)}.`
@@ -580,6 +630,10 @@
 
     async function compressFiles() {
       if (!state.files.length || state.isCompressing) return;
+
+      // On the hosted demo the videos cannot be transcoded, but the rest of the selection still
+      // gzips — so say why the videos will fail, then run the batch anyway.
+      if (state.hosted && state.files.some(isVideoFile)) openLocalOnly();
 
       revokeDownloads();
       state.results = [];
@@ -635,7 +689,13 @@
       const outputName = replaceExtension(file.name, '.compressed.mp4');
 
       if (!state.capabilities.videoTranscoding) {
-        return failure(file, outputName, 'Video compression needs ffmpeg on the local server.');
+        return failure(
+          file,
+          outputName,
+          state.hosted
+            ? 'Needs the local server — clone the repo and run "pnpm start".'
+            : 'Video compression needs ffmpeg on this machine.',
+        );
       }
 
       const formData = new FormData();
@@ -835,6 +895,25 @@
       const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
       const value = bytes / 1024 ** index;
       return `${value >= 10 || index === 0 ? Math.round(value) : value.toFixed(1)} ${units[index]}`;
+    }
+
+    function openLocalOnly() {
+      els.localOnlyCopy.textContent = 'Copy command';
+      if (typeof els.localOnly.showModal === 'function') {
+        els.localOnly.showModal();
+        return;
+      }
+      // No <dialog> support: the command still has to reach the user somehow.
+      setStatus('Video needs the local server — run "pnpm start" after cloning the repo.', 'error');
+    }
+
+    async function copyLocalOnlyCommand() {
+      try {
+        await navigator.clipboard.writeText(els.localOnlyCommand.textContent);
+        els.localOnlyCopy.textContent = 'Copied';
+      } catch {
+        els.localOnlyCopy.textContent = 'Copy failed — select it';
+      }
     }
 
     function setStatus(message, tone = '') {
