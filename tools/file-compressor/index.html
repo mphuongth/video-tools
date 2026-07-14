@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>File Compressor — Video Tools</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --chrome: #12151d;
+      --panel: #191d27;
+      --panel-raised: #20252f;
+      --ink: #f4f6fa;
+      --muted: #858d9d;
+      --faint: #626b7b;
+      --line: #242a36;
+      --line-strong: #333b4a;
+      --accent: #ff6a3d;
+      --accent-hot: #ff8259;
+      --accent-soft: rgba(255, 106, 61, 0.14);
+      --accent-ink: #0b0d12;
+      --danger: #ff6a6a;
+      --ok: #5fd08a;
+      --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      min-height: 100%;
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    body { min-height: 100dvh; overflow-x: hidden; }
+
+    button, input { font: inherit; }
+
+    button {
+      border: 1px solid var(--line-strong);
+      background: var(--panel-raised);
+      color: var(--ink);
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 550;
+      min-height: 38px;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
+    }
+
+    button:hover { border-color: var(--accent); background: #262c37; }
+    button:active { transform: translateY(1px) scale(0.99); }
+    button:disabled { opacity: 0.42; cursor: not-allowed; }
+    button:disabled:hover { border-color: var(--line-strong); background: var(--panel-raised); }
+
+    .primary {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+      font-weight: 650;
+    }
+
+    .primary:hover { background: var(--accent-hot); border-color: var(--accent-hot); }
+
+    .primary:disabled,
+    .primary:disabled:hover {
+      opacity: 1;
+      background: var(--panel-raised);
+      color: var(--faint);
+      border-color: var(--line-strong);
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 10px 16px;
+      background: #10131a;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      position: relative;
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      flex: none;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border: 1.5px solid var(--accent);
+    }
+
+    .brand-mark::before { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+    .brand-mark::after { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+
+    .back-link {
+      color: var(--muted);
+      text-decoration: none;
+      font: 500 11px/1 var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transition: color 180ms ease;
+    }
+
+    .back-link:hover { color: var(--ink); }
+
+    .brand-separator { color: var(--faint); font-size: 12px; }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .brand p {
+      margin: 5px 0 0 25px;
+      color: var(--muted);
+      font: 500 11px/1 var(--mono);
+    }
+
+    .top-actions { display: flex; gap: 8px; }
+
+    .file-input { display: none; }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 20px 56px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .dropzone {
+      position: relative;
+      min-height: 220px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background:
+        radial-gradient(120% 120% at 50% 30%, rgba(255, 106, 61, 0.05), transparent 60%),
+        var(--panel);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 36px 28px;
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease;
+    }
+
+    .dropzone.dragging {
+      border-color: var(--accent);
+      border-style: solid;
+      background:
+        radial-gradient(120% 120% at 50% 30%, var(--accent-soft), transparent 62%),
+        var(--panel);
+    }
+
+    .dz-corner {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid var(--line-strong);
+      transition: border-color 160ms ease;
+    }
+
+    .dz-corner.tl { top: 12px; left: 12px; border-right: 0; border-bottom: 0; }
+    .dz-corner.tr { top: 12px; right: 12px; border-left: 0; border-bottom: 0; }
+    .dz-corner.bl { bottom: 12px; left: 12px; border-right: 0; border-top: 0; }
+    .dz-corner.br { bottom: 12px; right: 12px; border-left: 0; border-top: 0; }
+    .dropzone.dragging .dz-corner { border-color: var(--accent); }
+
+    .dz-eyebrow {
+      display: block;
+      margin-bottom: 14px;
+      color: var(--accent);
+      font: 500 11px/1 var(--mono);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .dropzone h2 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+
+    .dropzone p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 46ch;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 12px;
+      padding: 14px 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .field { display: grid; gap: 6px; }
+
+    .field .label {
+      color: var(--muted);
+      font: 500 11px/1 var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .field input {
+      width: 120px;
+      padding: 8px 10px;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      min-height: 38px;
+    }
+
+    .controls .spacer { flex: 1 1 auto; }
+
+    .status {
+      color: var(--muted);
+      font: 500 11px/1.5 var(--mono);
+      letter-spacing: 0.02em;
+      flex-basis: 100%;
+    }
+
+    .status.error { color: var(--danger); }
+    .status.ok { color: var(--ok); }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .metric { background: var(--panel); padding: 14px 16px; }
+
+    .metric-label {
+      color: var(--faint);
+      font: 500 10px/1 var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .callout {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .callout strong { color: var(--ink); font-weight: 600; }
+
+    .table-wrap { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+    th {
+      text-align: left;
+      padding: 10px 16px;
+      color: var(--faint);
+      font: 500 10px/1 var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    .mono { font-family: var(--mono); white-space: nowrap; }
+
+    .file-name { word-break: break-all; }
+
+    .warn {
+      margin-top: 4px;
+      color: var(--accent);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line-strong);
+      font: 500 10px/1.5 var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .pill.good { color: var(--ok); border-color: rgba(95, 208, 138, 0.36); }
+    .pill.warn-tone { color: var(--accent); border-color: rgba(255, 106, 61, 0.36); }
+    .pill.bad { color: var(--danger); border-color: rgba(255, 106, 106, 0.36); }
+
+    .download {
+      color: var(--accent);
+      text-decoration: none;
+      font-family: var(--mono);
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    .download:hover { color: var(--accent-hot); text-decoration: underline; }
+
+    .empty {
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--faint);
+      font-size: 13px;
+    }
+
+    .note {
+      margin: 0;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      color: var(--faint);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 720px) {
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .top-actions { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-title">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <a class="back-link" href="../../">Video Tools</a>
+        <span class="brand-separator" aria-hidden="true">/</span>
+        <h1>File Compressor</h1>
+      </div>
+      <p id="fileName">No files selected</p>
+    </div>
+    <div class="top-actions">
+      <input id="fileInput" class="file-input" type="file" multiple />
+      <button id="chooseButton" type="button">Add files</button>
+      <button id="clearButton" type="button" disabled>Clear</button>
+      <button id="compressButton" class="primary" type="button" disabled>Compress</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-controls="fileInput">
+      <span class="dz-corner tl" aria-hidden="true"></span>
+      <span class="dz-corner tr" aria-hidden="true"></span>
+      <span class="dz-corner bl" aria-hidden="true"></span>
+      <span class="dz-corner br" aria-hidden="true"></span>
+      <div>
+        <span class="dz-eyebrow">Upload prep</span>
+        <h2>Drop the recording here</h2>
+        <p>
+          Videos are re-encoded to H.264 MP4 near your target size. Anything else is
+          packed as <code>.gz</code> in the browser. Originals are never touched.
+        </p>
+      </div>
+    </div>
+
+    <section class="controls">
+      <label class="field">
+        <span class="label">Target MiB</span>
+        <input id="targetSize" type="number" min="1" max="100" step="1" value="25" />
+      </label>
+      <div class="spacer"></div>
+      <div id="status" class="status">Checking local render capabilities…</div>
+    </section>
+
+    <section class="metrics" aria-live="polite">
+      <div class="metric">
+        <div class="metric-label">Selected</div>
+        <div id="metricFiles" class="metric-value">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Original</div>
+        <div id="metricOriginal" class="metric-value">0 B</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Compressed</div>
+        <div id="metricCompressed" class="metric-value">0 B</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Under target</div>
+        <div id="metricReady" class="metric-value">0</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="callout">
+        Videos become <strong>.compressed.mp4</strong>; other files become <strong>.gz</strong>.
+        A long video can still land over target — the encoder holds a quality floor rather than
+        crushing it to hit the number.
+      </div>
+      <div id="results"></div>
+      <p class="note">
+        GitHub's browser upload accepts files up to 25 MiB each. Plain git rejects anything over
+        100 MiB unless it is tracked with Git LFS.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    const BYTES_PER_MIB = 1024 * 1024;
+    const GIT_HARD_LIMIT_BYTES = 100 * BYTES_PER_MIB;
+    const GITHUB_UPLOAD_LIMIT_BYTES = 25 * BYTES_PER_MIB;
+
+    const alreadyCompressedExtensions = new Set([
+      '7z', 'avif', 'br', 'bz2', 'gif', 'gz', 'heic', 'jpeg', 'jpg', 'm4a', 'mp3', 'pdf', 'png',
+      'rar', 'webp', 'xz', 'zip',
+    ]);
+    const videoExtensions = new Set(['m4v', 'mov', 'mp4', 'webm']);
+
+    const state = {
+      files: [],
+      results: [],
+      isCompressing: false,
+      targetBytes: 25 * BYTES_PER_MIB,
+      capabilities: { loaded: false, videoTranscoding: false },
+    };
+
+    const els = {
+      fileInput: document.getElementById('fileInput'),
+      chooseButton: document.getElementById('chooseButton'),
+      clearButton: document.getElementById('clearButton'),
+      compressButton: document.getElementById('compressButton'),
+      dropzone: document.getElementById('dropzone'),
+      fileName: document.getElementById('fileName'),
+      targetSize: document.getElementById('targetSize'),
+      status: document.getElementById('status'),
+      results: document.getElementById('results'),
+      metricFiles: document.getElementById('metricFiles'),
+      metricOriginal: document.getElementById('metricOriginal'),
+      metricCompressed: document.getElementById('metricCompressed'),
+      metricReady: document.getElementById('metricReady'),
+    };
+
+    setup();
+    render();
+
+    function setup() {
+      if (!supportsGzip()) {
+        setStatus('CompressionStream is unavailable in this browser, so only videos can be compressed.', 'error');
+      }
+      loadCapabilities().catch(() => {
+        setStatus('Could not reach the local server.', 'error');
+      });
+
+      els.chooseButton.addEventListener('click', () => els.fileInput.click());
+      els.dropzone.addEventListener('click', () => els.fileInput.click());
+      els.dropzone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          els.fileInput.click();
+        }
+      });
+      els.fileInput.addEventListener('change', () => addFiles(Array.from(els.fileInput.files || [])));
+
+      for (const eventName of ['dragenter', 'dragover']) {
+        els.dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          els.dropzone.classList.add('dragging');
+        });
+      }
+
+      for (const eventName of ['dragleave', 'drop']) {
+        els.dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          els.dropzone.classList.remove('dragging');
+        });
+      }
+
+      els.dropzone.addEventListener('drop', (event) => {
+        addFiles(Array.from(event.dataTransfer?.files || []));
+      });
+
+      els.compressButton.addEventListener('click', compressFiles);
+      els.clearButton.addEventListener('click', clearAll);
+      els.targetSize.addEventListener('input', () => {
+        state.targetBytes = Math.max(1, Number(els.targetSize.value || 25)) * BYTES_PER_MIB;
+        render();
+      });
+    }
+
+    function supportsGzip() {
+      return typeof window.CompressionStream === 'function';
+    }
+
+    async function loadCapabilities() {
+      const response = await fetch('/api/capabilities');
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Failed to read capabilities');
+
+      state.capabilities = { loaded: true, videoTranscoding: Boolean(payload.videoTranscoding) };
+      setStatus(
+        payload.videoTranscoding
+          ? `Ready. ffmpeg: ${yesNo(payload.ffmpeg)}, ffprobe: ${yesNo(payload.ffprobe)}.`
+          : 'Video compression needs ffmpeg and ffprobe on this machine.',
+        payload.videoTranscoding ? 'ok' : 'error',
+      );
+      render();
+    }
+
+    function addFiles(files) {
+      if (!files.length) return;
+      revokeDownloads();
+      state.files = files;
+      state.results = [];
+      setStatus(`${files.length} file${files.length === 1 ? '' : 's'} selected.`);
+      render();
+    }
+
+    async function compressFiles() {
+      if (!state.files.length || state.isCompressing) return;
+
+      revokeDownloads();
+      state.results = [];
+      state.isCompressing = true;
+      render();
+
+      try {
+        for (const [index, file] of state.files.entries()) {
+          const action = isVideoFile(file) ? 'Transcoding' : 'Compressing';
+          setStatus(`${action} ${index + 1} of ${state.files.length}: ${file.name}`);
+          state.results.push(await compressFile(file));
+          render();
+        }
+        setStatus('Compression complete.', 'ok');
+      } catch (error) {
+        setStatus(error.message || 'Compression failed.', 'error');
+      } finally {
+        state.isCompressing = false;
+        render();
+      }
+    }
+
+    function compressFile(file) {
+      return isVideoFile(file) ? compressVideoFile(file) : compressArchiveFile(file);
+    }
+
+    /** Non-video files are gzipped in the browser — no server round-trip needed. */
+    async function compressArchiveFile(file) {
+      const outputName = `${file.name}.gz`;
+
+      if (!supportsGzip()) {
+        return failure(file, outputName, 'This browser has no CompressionStream.');
+      }
+
+      try {
+        const stream = file.stream().pipeThrough(new CompressionStream('gzip'));
+        const archive = new Blob([await new Response(stream).blob()], { type: 'application/gzip' });
+        return {
+          file,
+          ok: true,
+          outputName,
+          outputSize: archive.size,
+          downloadUrl: URL.createObjectURL(archive),
+          warning: buildCompressionWarning(file, archive.size),
+        };
+      } catch (error) {
+        return failure(file, outputName, error.message || 'Could not compress this file.');
+      }
+    }
+
+    /** Videos go to the server, which re-encodes them with ffmpeg. */
+    async function compressVideoFile(file) {
+      const outputName = replaceExtension(file.name, '.compressed.mp4');
+
+      if (!state.capabilities.videoTranscoding) {
+        return failure(file, outputName, 'Video compression needs ffmpeg on the local server.');
+      }
+
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      formData.append('targetMiB', String(Math.max(1, Number(els.targetSize.value || 25))));
+
+      const response = await fetch('/api/compress-video', { method: 'POST', body: formData });
+
+      if (!response.ok) {
+        let message = 'Video compression failed.';
+        try {
+          const payload = await response.json();
+          message = payload.error || message;
+        } catch {}
+        return failure(file, outputName, message);
+      }
+
+      const blob = await response.blob();
+      return {
+        file,
+        ok: true,
+        outputName: response.headers.get('X-Output-Filename') || outputName,
+        outputSize: blob.size,
+        downloadUrl: URL.createObjectURL(blob),
+        warning: buildCompressionWarning(file, blob.size),
+      };
+    }
+
+    function failure(file, outputName, error) {
+      return { file, ok: false, outputName, outputSize: 0, error, warning: buildFileWarning(file) };
+    }
+
+    function buildFileWarning(file) {
+      if (isVideoFile(file)) return '';
+      const extension = getExtension(file.name);
+      return alreadyCompressedExtensions.has(extension) ? 'Already a compressed format' : '';
+    }
+
+    function buildCompressionWarning(file, outputSize) {
+      const warnings = [];
+      const fileWarning = buildFileWarning(file);
+      if (fileWarning) warnings.push(fileWarning);
+      if (outputSize >= file.size) warnings.push('Output is not smaller than the original');
+      if (outputSize > state.targetBytes) warnings.push('Still over target');
+      return warnings.join(' · ');
+    }
+
+    function clearAll() {
+      revokeDownloads();
+      state.files = [];
+      state.results = [];
+      state.isCompressing = false;
+      els.fileInput.value = '';
+      setStatus('Ready.');
+      render();
+    }
+
+    function revokeDownloads() {
+      for (const result of state.results) {
+        if (result.downloadUrl) URL.revokeObjectURL(result.downloadUrl);
+      }
+    }
+
+    function render() {
+      els.compressButton.disabled = !state.files.length || state.isCompressing;
+      els.clearButton.disabled = !state.files.length && !state.results.length;
+      els.fileName.textContent = state.files.length
+        ? `${state.files.length} file${state.files.length === 1 ? '' : 's'}, ${formatBytes(totalOriginalBytes())}`
+        : 'No files selected';
+
+      const totalCompressed = state.results.reduce(
+        (sum, result) => sum + (result.ok ? result.outputSize : 0),
+        0,
+      );
+      const readyCount = state.results.filter(
+        (result) => result.ok && result.outputSize <= state.targetBytes,
+      ).length;
+
+      els.metricFiles.textContent = String(state.files.length);
+      els.metricOriginal.textContent = formatBytes(totalOriginalBytes());
+      els.metricCompressed.textContent = formatBytes(totalCompressed);
+      els.metricReady.textContent = String(readyCount);
+
+      if (!state.files.length) {
+        els.results.innerHTML = '<div class="empty">Nothing selected yet.</div>';
+        return;
+      }
+
+      els.results.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Original</th>
+                <th>Compressed</th>
+                <th>Saved</th>
+                <th>Status</th>
+                <th>Output</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${state.files
+                .map((file) => renderRow(file, state.results.find((item) => item.file === file)))
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderRow(file, result) {
+      const name = `
+        <div class="file-name">${escapeHtml(file.name)}</div>
+        ${renderWarning(result ? result.warning : buildFileWarning(file))}
+      `;
+
+      if (!result) {
+        return `
+          <tr>
+            <td>${name}</td>
+            <td class="mono">${formatBytes(file.size)}</td>
+            <td class="mono">—</td>
+            <td class="mono">—</td>
+            <td>${renderPill(sizeStatus(file.size))}</td>
+            <td class="mono">Pending</td>
+          </tr>
+        `;
+      }
+
+      if (!result.ok) {
+        return `
+          <tr>
+            <td>${name}</td>
+            <td class="mono">${formatBytes(file.size)}</td>
+            <td class="mono">Failed</td>
+            <td class="mono">—</td>
+            <td>${renderPill({ label: 'Failed', tone: 'bad' })}</td>
+            <td>${escapeHtml(result.error || '')}</td>
+          </tr>
+        `;
+      }
+
+      const saved = 1 - result.outputSize / Math.max(file.size, 1);
+
+      return `
+        <tr>
+          <td>${name}</td>
+          <td class="mono">${formatBytes(file.size)}</td>
+          <td class="mono">${formatBytes(result.outputSize)}</td>
+          <td class="mono">${saved > 0 ? `${Math.round(saved * 100)}%` : '—'}</td>
+          <td>${renderPill(sizeStatus(result.outputSize))}</td>
+          <td>
+            <a class="download" href="${result.downloadUrl}" download="${escapeHtml(result.outputName)}">
+              ${escapeHtml(result.outputName)}
+            </a>
+          </td>
+        </tr>
+      `;
+    }
+
+    function sizeStatus(bytes) {
+      if (bytes > GIT_HARD_LIMIT_BYTES) return { label: 'Over git limit', tone: 'bad' };
+      if (bytes > GITHUB_UPLOAD_LIMIT_BYTES) return { label: 'Over upload limit', tone: 'warn-tone' };
+      return { label: 'Uploadable', tone: 'good' };
+    }
+
+    function renderPill(status) {
+      return `<span class="pill ${status.tone}">${escapeHtml(status.label)}</span>`;
+    }
+
+    function renderWarning(warning) {
+      return warning ? `<div class="warn">${escapeHtml(warning)}</div>` : '';
+    }
+
+    function totalOriginalBytes() {
+      return state.files.reduce((sum, file) => sum + file.size, 0);
+    }
+
+    function isVideoFile(file) {
+      return String(file.type || '').startsWith('video/') || videoExtensions.has(getExtension(file.name));
+    }
+
+    function getExtension(fileName) {
+      const parts = String(fileName || '').toLowerCase().split('.');
+      return parts.length > 1 ? parts.pop() : '';
+    }
+
+    function replaceExtension(fileName, extension) {
+      const base = String(fileName || 'file').replace(/\.[^.]+$/, '');
+      return `${base || 'file'}${extension}`;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KiB', 'MiB', 'GiB'];
+      const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+      const value = bytes / 1024 ** index;
+      return `${value >= 10 || index === 0 ? Math.round(value) : value.toFixed(1)} ${units[index]}`;
+    }
+
+    function setStatus(message, tone = '') {
+      els.status.textContent = message;
+      els.status.className = `status${tone ? ` ${tone}` : ''}`;
+    }
+
+    function yesNo(value) {
+      return value ? 'yes' : 'no';
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[character]);
+    }
+  </script>
+</body>
+</html>

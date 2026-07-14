@@ -1,142 +1,61 @@
-#!/usr/bin/env node
-
-import { createServer } from 'node:http';
 import { execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import os from 'node:os';
-import { Readable } from 'node:stream';
-import { fileURLToPath } from 'node:url';
 import { createCanvas } from '@napi-rs/canvas';
 
+import { detectCapabilities } from '../../lib/ffmpeg.mjs';
+import { UserInputError } from '../../lib/http.mjs';
+
 const execFile = promisify(execFileCb);
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Honor the app's own env vars first; fall back to the platform PORT (Render,
-// Railway, Fly, …) and bind on all interfaces when running on such a host.
-const PORT = Number(process.env.VIDEO_ZOOM_EDITOR_PORT || process.env.PORT || 4320);
-const HOST = process.env.VIDEO_ZOOM_EDITOR_HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
-const INDEX_HTML_PATH = path.join(__dirname, 'index.html');
-const LANDING_HTML_PATH = path.resolve(__dirname, '../../index.html');
-const PREVIEW_IMAGE_PATH = path.resolve(__dirname, '../../assets/video-zoom-editor-preview.jpg');
 
-class UserInputError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'UserInputError';
-    this.statusCode = 400;
+/**
+ * Renders a project's zooms and text overlays onto a video. Paths in, path out —
+ * the caller owns the temp directory and the HTTP layer, so the server, a test,
+ * and any future CLI all drive the same code.
+ */
+export async function exportEditedVideo({ inputPath, outputPath, tempDir, rawProject }) {
+  const capabilities = await detectCapabilities();
+  if (!capabilities.videoRendering) {
+    throw capabilityError('Video export needs ffmpeg and ffprobe installed on this machine.', capabilities);
   }
-}
 
-async function main() {
-  const server = createServer(handleRequest);
-  server.listen(PORT, HOST, () => {
-    process.stdout.write(`Video tools: http://${HOST}:${PORT}\n`);
+  const project = normalizeProject(parseProjectJson(rawProject));
+  validateProject(project);
+
+  if (project.texts.length && !capabilities.pngTextFallback) {
+    throw capabilityError(
+      'Text export needs Swift/AppKit fallback because this ffmpeg build has no drawtext filter.',
+      capabilities,
+    );
+  }
+
+  const metadata = await probeVideoMetadata(inputPath);
+  validateProjectAgainstVideo(project, metadata.duration);
+
+  const textInputs = [];
+  for (const text of project.texts) {
+    const imagePath = path.join(tempDir, `${text.id}.png`);
+    await renderTextOverlay(text, imagePath, metadata.width);
+    textInputs.push({ ...text, imagePath });
+  }
+
+  const args = buildFfmpegArgs(inputPath, outputPath, project, textInputs, metadata);
+  await execFile('ffmpeg', args, {
+    timeout: 30 * 60 * 1_000,
+    maxBuffer: 40 * 1024 * 1024,
   });
+
+  const { size } = await stat(outputPath);
+  return { outputPath, outputBytes: size, durationSeconds: metadata.duration };
 }
 
-async function handleRequest(req, res) {
-  try {
-    const url = new URL(req.url || '/', `http://${req.headers.host || `${HOST}:${PORT}`}`);
-
-    if (req.method === 'GET' && url.pathname === '/') {
-      return send(res, 200, await readFile(LANDING_HTML_PATH, 'utf8'), 'text/html; charset=utf-8');
-    }
-
-    if (req.method === 'GET' && (url.pathname === '/tools/video-zoom-editor' || url.pathname === '/tools/video-zoom-editor/')) {
-      return send(res, 200, await readFile(INDEX_HTML_PATH, 'utf8'), 'text/html; charset=utf-8');
-    }
-
-    if (req.method === 'GET' && url.pathname === '/assets/video-zoom-editor-preview.jpg') {
-      return send(res, 200, await readFile(PREVIEW_IMAGE_PATH), 'image/jpeg');
-    }
-
-    if (req.method === 'GET' && url.pathname === '/favicon.ico') {
-      return send(res, 204, '', 'image/x-icon');
-    }
-
-    if (req.method === 'GET' && url.pathname === '/api/capabilities') {
-      return sendJson(res, 200, await buildCapabilities());
-    }
-
-    if (req.method === 'POST' && url.pathname === '/api/export') {
-      return exportVideo(req, res);
-    }
-
-    return sendJson(res, 404, { error: 'Not found' });
-  } catch (error) {
-    return sendJson(res, 500, { error: error.message || 'Unexpected server error.' });
-  }
-}
-
-async function exportVideo(req, res) {
-  let tempDir = '';
-
-  try {
-    const capabilities = await buildCapabilities();
-    if (!capabilities.videoRendering) {
-      return sendJson(res, 400, {
-        error: 'Video export needs ffmpeg and ffprobe installed on this machine.',
-        capabilities,
-      });
-    }
-
-    const formData = await readMultipartFormData(req);
-    const file = formData.get('video');
-    if (!file || typeof file.arrayBuffer !== 'function') {
-      return sendJson(res, 400, { error: 'Missing video file.' });
-    }
-
-    const rawProject = String(formData.get('project') || '{}');
-    const project = normalizeProject(parseProjectJson(rawProject));
-    validateProject(project);
-
-    if (project.texts.length && !capabilities.pngTextFallback) {
-      return sendJson(res, 400, {
-        error: 'Text export needs Swift/AppKit fallback because this ffmpeg build has no drawtext filter.',
-        capabilities,
-      });
-    }
-
-    const originalName = sanitizeFileName(file.name || 'recording.mov');
-    const outputName = replaceExtension(originalName, '.edited.mp4');
-
-    tempDir = await mkdtemp(path.join(os.tmpdir(), 'video-zoom-editor-'));
-    const inputPath = path.join(tempDir, originalName);
-    const outputPath = path.join(tempDir, outputName);
-    await writeFile(inputPath, Buffer.from(await file.arrayBuffer()));
-
-    const metadata = await probeVideoMetadata(inputPath);
-    validateProjectAgainstVideo(project, metadata.duration);
-
-    const textInputs = [];
-    for (const text of project.texts) {
-      const imagePath = path.join(tempDir, `${text.id}.png`);
-      await renderTextOverlay(text, imagePath, metadata.width);
-      textInputs.push({ ...text, imagePath });
-    }
-
-    const args = buildFfmpegArgs(inputPath, outputPath, project, textInputs, metadata);
-    await execFile('ffmpeg', args, {
-      timeout: 30 * 60 * 1_000,
-      maxBuffer: 40 * 1024 * 1024,
-    });
-
-    const [outputBuffer, outputStat] = await Promise.all([readFile(outputPath), stat(outputPath)]);
-    return sendDownload(res, 200, outputBuffer, 'video/mp4', outputName, {
-      'X-Original-Filename': originalName,
-      'X-Output-Filename': outputName,
-      'X-Output-Size': String(outputStat.size),
-      'X-Video-Duration-Seconds': String(metadata.duration),
-    });
-  } catch (error) {
-    return sendJson(res, error.statusCode || 500, { error: error.message || 'Video export failed.' });
-  } finally {
-    if (tempDir) {
-      await rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    }
-  }
+/** Carries the capability flags, so the UI can say exactly which binary is missing. */
+function capabilityError(message, capabilities) {
+  const error = new UserInputError(message);
+  error.capabilities = capabilities;
+  return error;
 }
 
 function parseProjectJson(rawProject) {
@@ -145,52 +64,6 @@ function parseProjectJson(rawProject) {
   } catch {
     throw new UserInputError('Project JSON is invalid.');
   }
-}
-
-async function buildCapabilities() {
-  const [ffmpeg, ffprobe] = await Promise.all([
-    isCommandAvailable('ffmpeg', ['-version']),
-    isCommandAvailable('ffprobe', ['-version']),
-  ]);
-
-  return {
-    ffmpeg,
-    ffprobe,
-    videoRendering: ffmpeg && ffprobe,
-    // Text overlays are drawn in-process with @napi-rs/canvas, so text export
-    // works anywhere ffmpeg does — no drawtext filter or Swift toolchain needed.
-    textRendering: true,
-    pngTextFallback: true,
-  };
-}
-
-async function isCommandAvailable(command, args) {
-  try {
-    await execFile(command, args, { timeout: 5_000, maxBuffer: 256 * 1024 });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function readMultipartFormData(req) {
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (Array.isArray(value)) {
-      headers.set(key, value.join(', '));
-    } else if (value) {
-      headers.set(key, value);
-    }
-  }
-
-  const request = new Request('http://video-zoom-editor.local/export', {
-    method: req.method,
-    headers,
-    body: Readable.toWeb(req),
-    duplex: 'half',
-  });
-
-  return request.formData();
 }
 
 async function probeVideoMetadata(inputPath) {
@@ -518,40 +391,3 @@ function sanitizeId(raw, fallbackPrefix) {
   if (cleaned) return cleaned;
   return `${fallbackPrefix}${createHash('sha1').update(String(Math.random())).digest('hex').slice(0, 8)}`;
 }
-
-function sanitizeFileName(fileName) {
-  const baseName = path.basename(String(fileName || 'file')).replace(/[^\w .@()-]/g, '_').trim();
-  return baseName.slice(0, 160) || 'file';
-}
-
-function replaceExtension(fileName, extension) {
-  const parsed = path.parse(sanitizeFileName(fileName));
-  return `${parsed.name || 'file'}${extension}`;
-}
-
-function sendJson(res, statusCode, payload) {
-  return send(res, statusCode, `${JSON.stringify(payload, null, 2)}\n`, 'application/json; charset=utf-8');
-}
-
-function sendDownload(res, statusCode, body, contentType, filename, headers = {}) {
-  res.writeHead(statusCode, {
-    'Content-Type': contentType,
-    'Content-Length': Buffer.byteLength(body),
-    'Content-Disposition': `attachment; filename="${filename.replace(/"/g, '')}"`,
-    ...headers,
-  });
-  res.end(body);
-}
-
-function send(res, statusCode, body, contentType) {
-  res.writeHead(statusCode, {
-    'Content-Type': contentType,
-    'Content-Length': Buffer.byteLength(body),
-  });
-  res.end(body);
-}
-
-main().catch((error) => {
-  process.stderr.write(`Video zoom editor failed: ${error.message || error}\n`);
-  process.exit(1);
-});

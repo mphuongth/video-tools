@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node tools/video-zoom-editor/server.mjs",
-    "video-zoom-editor": "node tools/video-zoom-editor/server.mjs"
+    "start": "node server.mjs",
+    "serve": "node server.mjs",
+    "compress": "node tools/file-compressor/compressor.mjs"
   },
   "engines": {
     "node": ">=18"
