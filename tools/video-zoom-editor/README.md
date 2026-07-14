@@ -6,22 +6,26 @@ It lets you add manual zooms and text callouts after recording, then renders a f
 
 ## Run
 
+One server hosts every tool in the repo:
+
 ```sh
 pnpm install
-pnpm video-zoom-editor
+pnpm start
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:4320
+http://127.0.0.1:4320/tools/video-zoom-editor
 ```
 
 Use a custom port if needed:
 
 ```sh
-VIDEO_ZOOM_EDITOR_PORT=4321 pnpm video-zoom-editor
+VIDEO_TOOLS_PORT=4321 pnpm start
 ```
+
+The editor page also loads from a static host (see the live demo in the root README), but export needs this server, because that is where `ffmpeg` runs.
 
 ## Workflow
 

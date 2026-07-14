@@ -32,11 +32,19 @@ The compressor also runs headless:
 pnpm compress demo.mov --target 8    # target 8 MiB; defaults to 25
 ```
 
+## Live demo
+
+<https://mphuongth.github.io/video-tools/> — GitHub Pages, so there is no `ffmpeg` behind it.
+
+The editor is still worth opening: loading a recording, drawing zooms, adding text, and previewing all run in the browser, and only Export is disabled. The compressor still gzips non-video files, but cannot transcode video. Both tools say so on the page. To actually export or compress video, run it locally.
+
 ## Deploy
 
-Both tools shell out to `ffmpeg` server-side, so they need a host that runs Node **and** ships `ffmpeg` — a static host (GitHub Pages, plain Vercel) cannot export or compress. The repo ships a `Dockerfile` (Debian + `ffmpeg` + fonts) for any container host.
+Running locally is the intended way to use these tools, and deploying is optional.
 
-Deploying is optional, and export on a small free instance is slow — running locally stays the fastest path.
+Both tools shell out to `ffmpeg` server-side, so a real deploy needs a host that runs Node **and** ships `ffmpeg` — a static host (GitHub Pages, plain Vercel) can serve the pages but cannot export or compress. The repo ships a `Dockerfile` (Debian + `ffmpeg` + fonts) for any container host.
+
+Be aware that transcoding is CPU-bound: export on a small free instance is slow enough to be annoying, and a local run will beat it every time. Deploy for access, not for speed.
 
 - **Render** — push the repo, then `New +` → `Blueprint` and pick this repo. `render.yaml` configures a free Docker web service with a `/api/capabilities` health check.
 - **Railway / Fly.io / any Docker host** — build the `Dockerfile`. The server binds `0.0.0.0` and honors the injected `PORT`.
