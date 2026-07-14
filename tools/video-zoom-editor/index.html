@@ -742,6 +742,30 @@
         transition-duration: 1ms !important;
       }
     }
+    /* Hosted demo: export needs ffmpeg on the user's machine, so hand over the command. */
+    .local-only {
+      width: min(540px, calc(100vw - 32px));
+      padding: 26px;
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.75);
+    }
+    .local-only::backdrop { background: rgba(6, 8, 12, 0.72); }
+    .local-only h2 { margin: 0 0 10px; font-size: 19px; font-weight: 640; letter-spacing: -0.01em; }
+    .local-only p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .local-only pre {
+      margin: 0;
+      padding: 14px;
+      overflow-x: auto;
+      color: var(--ink);
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font: 500 12px/1.7 var(--mono);
+    }
+    .local-only-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
   </style>
 </head>
 <body>
@@ -846,6 +870,23 @@
     </aside>
   </main>
 
+  <dialog id="localOnly" class="local-only" aria-labelledby="localOnlyTitle">
+    <h2 id="localOnlyTitle">Export runs on your machine</h2>
+    <p>
+      This is the hosted demo, and there is no <code>ffmpeg</code> behind it. Your zooms and text
+      are real edits — but rendering them into an MP4 needs the local server. Run it, reopen your
+      recording, and export from there.
+    </p>
+    <pre id="localOnlyCommand">git clone https://github.com/mphuongth/video-tools
+cd video-tools
+pnpm install
+pnpm start</pre>
+    <div class="local-only-actions">
+      <button id="localOnlyCopy" type="button">Copy command</button>
+      <button id="localOnlyClose" class="primary" type="button">Got it</button>
+    </div>
+  </dialog>
+
   <script>
     const els = {
       chooseButton: document.getElementById('chooseButton'),
@@ -864,6 +905,10 @@
       fileName: document.getElementById('fileName'),
       editCount: document.getElementById('editCount'),
       exportButton: document.getElementById('exportButton'),
+      localOnly: document.getElementById('localOnly'),
+      localOnlyCommand: document.getElementById('localOnlyCommand'),
+      localOnlyCopy: document.getElementById('localOnlyCopy'),
+      localOnlyClose: document.getElementById('localOnlyClose'),
       status: document.getElementById('status'),
       zoomMode: document.getElementById('zoomMode'),
       textMode: document.getElementById('textMode'),
@@ -887,6 +932,7 @@
       texts: [],
       selected: '',
       capabilities: null,
+      hosted: false,
       exporting: false,
       dragTextId: '',
     };
@@ -930,6 +976,8 @@
       els.textMode.addEventListener('click', () => toggleMode('text'));
       els.surface.addEventListener('click', handleSurfaceClick);
       els.exportButton.addEventListener('click', exportVideo);
+      els.localOnlyClose.addEventListener('click', () => els.localOnly.close());
+      els.localOnlyCopy.addEventListener('click', copyLocalOnlyCommand);
 
       els.video.addEventListener('loadedmetadata', () => {
         state.duration = els.video.duration || 0;
@@ -949,6 +997,7 @@
         const response = await fetch('/api/capabilities');
         if (!response.ok) throw new Error('no render server');
         state.capabilities = await response.json();
+        state.hosted = false;
         const textMode = state.capabilities.textRendering
           ? state.capabilities.drawtext
             ? 'drawtext'
@@ -956,8 +1005,10 @@
           : 'text export unavailable';
         setStatus(`Ready. ffmpeg: ${yesNo(state.capabilities.ffmpeg)}, ffprobe: ${yesNo(state.capabilities.ffprobe)}, text: ${textMode}.`, 'ok');
       } catch (error) {
-        // Hosted preview with no local render server: editing works, export doesn't.
+        // Hosted demo with no local render server: editing works, export doesn't. Export stays
+        // clickable on purpose — pressing it is how people find out why, and how to fix it.
         state.capabilities = null;
+        state.hosted = true;
         setStatus('Live demo — zoom and text work here. Clone the repo and run "pnpm start" to export an MP4.', '');
       }
       updateUI();
@@ -1107,7 +1158,7 @@
     }
 
     function updateUI() {
-      els.exportButton.disabled = !state.file || state.exporting || !state.capabilities?.videoRendering || Boolean(findZoomOverlap(state.zooms)) || hasEmptyText();
+      els.exportButton.disabled = !state.file || state.exporting || (!state.hosted && !state.capabilities?.videoRendering) || Boolean(findZoomOverlap(state.zooms)) || hasEmptyText();
       els.zoomMode.disabled = !state.file;
       els.textMode.disabled = !state.file;
       els.surface.classList.toggle('placing', state.mode === 'zoom' || state.mode === 'text');
@@ -1405,7 +1456,7 @@
       if (overlap) setStatus('Zoom events cannot overlap in v1.', 'error');
       else if (hasEmptyText()) setStatus('Enter content for the empty text edit before exporting.', 'error');
       else setStatus('Changes ready for export.', 'ok');
-      els.exportButton.disabled = !state.file || state.exporting || !state.capabilities?.videoRendering || Boolean(overlap) || hasEmptyText();
+      els.exportButton.disabled = !state.file || state.exporting || (!state.hosted && !state.capabilities?.videoRendering) || Boolean(overlap) || hasEmptyText();
       renderTimeline();
       renderPreviewOverlays();
     }
@@ -1420,6 +1471,11 @@
 
     async function exportVideo() {
       if (!state.file || state.exporting) return;
+
+      if (state.hosted) {
+        openLocalOnly();
+        return;
+      }
 
       const overlap = findZoomOverlap(state.zooms);
       if (overlap) {
@@ -1504,6 +1560,25 @@
         if (sorted[index].start < sorted[index - 1].end) return [sorted[index - 1], sorted[index]];
       }
       return null;
+    }
+
+    function openLocalOnly() {
+      els.localOnlyCopy.textContent = 'Copy command';
+      if (typeof els.localOnly.showModal === 'function') {
+        els.localOnly.showModal();
+        return;
+      }
+      // No <dialog> support: the command still has to reach the user somehow.
+      setStatus('Export needs the local server — run "pnpm start" after cloning the repo.', 'error');
+    }
+
+    async function copyLocalOnlyCommand() {
+      try {
+        await navigator.clipboard.writeText(els.localOnlyCommand.textContent);
+        els.localOnlyCopy.textContent = 'Copied';
+      } catch {
+        els.localOnlyCopy.textContent = 'Copy failed — select it';
+      }
     }
 
     function setStatus(message, type) {
