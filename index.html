@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="A local viewfinder for screen recordings. Draw a zoom, add text, export an MP4 — nothing leaves your machine." />
-  <title>Video Tools — a viewfinder for screen recordings</title>
+  <meta name="description" content="Two local tools for screen recordings. Draw a zoom, add text, export an MP4 — then shrink the file down to send it. Nothing leaves your machine." />
+  <title>Video Tools — local tools for screen recordings</title>
   <style>
     * { box-sizing: border-box; }
 
@@ -653,6 +653,13 @@
     .step-time { color: var(--signal); font: 500 11px/1.6 var(--mono); letter-spacing: 0.1em; }
     .step h3 { margin: 0; font-size: 19px; font-weight: 640; letter-spacing: -0.01em; }
     .step p { margin: 8px 0 0; max-width: 52ch; color: var(--muted); font-size: 14px; line-height: 1.65; }
+    .step p a {
+      color: var(--ink-dim);
+      text-decoration-color: var(--muted-2);
+      text-underline-offset: 3px;
+      transition: color 200ms var(--ease);
+    }
+    .step p a:hover { color: var(--signal); text-decoration-color: var(--signal); }
 
     /* ---- final cta ---- */
     .render {
@@ -665,6 +672,7 @@
     }
     .render h2 { max-width: 15ch; }
     .render .sub { margin: 18px 0 0; max-width: 40ch; color: var(--muted); font-size: 15px; line-height: 1.6; }
+    .render-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 
     footer {
       display: flex;
@@ -759,11 +767,11 @@
       <span>Video&nbsp;Tools</span>
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#tool">Tool</a>
+      <a href="#tools">Tools</a>
       <a href="#workflow">Workflow</a>
       <a href="https://github.com/phuongtruong-agilityio/video-tools">Source</a>
     </nav>
-    <a class="nav-action" href="tools/video-zoom-editor/">Open editor</a>
+    <a class="nav-action" href="#tools">Open a tool</a>
   </header>
 
   <main id="main">
@@ -771,23 +779,24 @@
       <div class="hero-text">
         <p class="hero-eyebrow code reveal">
           <span class="rec">REC</span>
-          <span>Local viewfinder · 00:00</span>
+          <span>Local toolkit · 00:00</span>
         </p>
-        <h1 id="hero-title" class="reveal d1">Zoom in on <em>what matters.</em></h1>
+        <h1 id="hero-title" class="reveal d1">Your recordings, <em>handled locally.</em></h1>
         <p class="hero-copy reveal d2">
-          Drop in any QuickTime, OBS, or Loom recording. Draw a zoom where the
-          action is, drop text on screen, and watch it back. Export an MP4 —
-          nothing leaves your machine.
+          Two tools that run on your machine. Zoom in on what matters and put
+          context on screen, then shrink the export down until it is small
+          enough to send. Nothing leaves your machine.
         </p>
         <div class="hero-actions reveal d2">
           <a class="button" href="tools/video-zoom-editor/">
             Open Video Zoom Editor <span class="arrow" aria-hidden="true">→</span>
           </a>
-          <a class="button ghost" href="#tool">See how it works</a>
+          <a class="button ghost" href="tools/file-compressor/">
+            Open File Compressor <span class="arrow" aria-hidden="true">→</span>
+          </a>
         </div>
         <p class="hero-spec code reveal d3">
           <span>Runs local</span>
-          <span>H.264 MP4</span>
           <span>ffmpeg engine</span>
           <span>No upload</span>
         </p>
@@ -834,21 +843,21 @@
     </section>
 
     <section class="shell status-rail" aria-live="polite">
-      <span><strong>Video Zoom Editor</strong> — available now, running on this machine</span>
+      <span><strong>Two tools</strong> — available now, running on this machine</span>
       <span class="engine-state" id="engineState" data-state="loading">Checking render engine</span>
     </section>
 
-    <section class="band" id="tool" aria-labelledby="tool-title">
+    <section class="band" id="tools" aria-labelledby="tools-title">
       <div class="shell">
         <div class="band-head">
           <div>
-            <p class="timecode code reveal"><span class="crop" aria-hidden="true"></span>00:00 <span class="dim">/ the edit</span></p>
-            <h2 id="tool-title" class="reveal d1">The edit that starts when you stop recording.</h2>
+            <p class="timecode code reveal"><span class="crop" aria-hidden="true"></span>00:00 <span class="dim">/ the tools</span></p>
+            <h2 id="tools-title" class="reveal d1">Everything that happens after you stop recording.</h2>
           </div>
           <p class="reveal d1">
             Keep recording however you already do. Video Tools picks up the
-            finished file and gives you only the controls that guide attention —
-            nothing else to learn.
+            finished file — one tool to guide attention, one to get the result
+            small enough to send.
           </p>
         </div>
 
@@ -873,7 +882,8 @@
           </span>
           <span class="tool-desc">
             Re-encodes a recording down to a target size, so it clears the 25 MiB
-            limit on a GitHub issue, a pull request, or a chat thread.
+            limit on a GitHub issue, a pull request, or a chat thread. Non-video
+            files are gzipped in the browser.
           </span>
           <span class="tool-open">Open tool <span class="arrow" aria-hidden="true">→</span></span>
         </a>
@@ -883,15 +893,15 @@
             <img src="assets/video-zoom-editor-preview.jpg" alt="The Video Zoom Editor interface with a screen recording, a zoom focus bracket, timeline, and inspector panel" />
           </div>
           <figcaption>
-            <span>The actual local editor</span>
+            <span>Video Zoom Editor — the actual local interface</span>
             <span>Preview / timeline / inspector / export</span>
           </figcaption>
         </figure>
 
         <div class="flow" id="workflow">
           <div class="flow-title">
-            <h2>Four moves, start to export.</h2>
-            <p>Every control maps to one decision about where the viewer should look next.</p>
+            <h2>Five moves, recording to shipped.</h2>
+            <p>The first four are the editor: every control maps to one decision about where the viewer should look next. The last one gets the file out the door.</p>
           </div>
           <div class="step-list">
             <article class="step">
@@ -922,6 +932,13 @@
                 <p>The local server renders with ffmpeg to a portable H.264 file with AAC audio and fast-start enabled. No footage sent away.</p>
               </div>
             </article>
+            <article class="step">
+              <span class="step-time">00:32</span>
+              <div>
+                <h3>Shrink it to fit</h3>
+                <p>A long recording exports big, and GitHub's browser upload stops at 25 MiB. Hand it to the <a href="tools/file-compressor/">File Compressor</a>, name a target size, and it re-encodes to fit — or gzips a non-video file without leaving the browser.</p>
+              </div>
+            </article>
           </div>
         </div>
       </div>
@@ -929,13 +946,18 @@
 
     <section class="shell render">
       <div>
-        <p class="timecode code"><span class="crop" aria-hidden="true"></span>00:24 <span class="dim">/ export</span></p>
+        <p class="timecode code"><span class="crop" aria-hidden="true"></span>00:32 <span class="dim">/ ship</span></p>
         <h2>Make the next recording easier to follow.</h2>
-        <p class="sub">Start with the file you already have. It opens in the browser and runs on this machine.</p>
+        <p class="sub">Start with the file you already have. Both tools open in the browser and run on this machine.</p>
       </div>
-      <a class="button" href="tools/video-zoom-editor/">
-        Open Video Zoom Editor <span class="arrow" aria-hidden="true">→</span>
-      </a>
+      <div class="render-actions">
+        <a class="button" href="tools/video-zoom-editor/">
+          Open Video Zoom Editor <span class="arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="button ghost" href="tools/file-compressor/">
+          Open File Compressor <span class="arrow" aria-hidden="true">→</span>
+        </a>
+      </div>
     </section>
   </main>
 
