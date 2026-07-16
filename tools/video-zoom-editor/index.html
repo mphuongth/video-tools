@@ -1490,21 +1490,29 @@ pnpm start</pre>
 
       state.exporting = true;
       updateUI();
-      setStatus('Rendering MP4 with ffmpeg...', 'ok');
 
+      let stopEncodingClock = () => {};
       try {
         const formData = new FormData();
         formData.append('video', state.file, state.file.name);
         formData.append('project', JSON.stringify(projectPayload()));
 
-        const response = await fetch('/api/export', { method: 'POST', body: formData });
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}));
-          throw new Error(error.error || 'Export failed.');
-        }
+        setStatus('Uploading 0%', 'ok');
+        const { blob, xhr } = await postForBlob('/api/export', formData, {
+          onUpload: (fraction) => {
+            if (fraction < 1) setStatus(`Uploading ${Math.round(fraction * 100)}%`, 'ok');
+          },
+          // Upload finished; ffmpeg is working now. No real percentage from here,
+          // so an elapsed clock stands in for it — enough that the UI never looks hung.
+          onEncodingStart: () => {
+            stopEncodingClock = startClock((elapsed) =>
+              setStatus(`Rendering MP4 with ffmpeg… ${elapsed}`, 'ok'),
+            );
+          },
+        });
+        stopEncodingClock();
 
-        const blob = await response.blob();
-        const outputName = response.headers.get('X-Output-Filename') || outputFileName(state.file.name);
+        const outputName = xhr.getResponseHeader('X-Output-Filename') || outputFileName(state.file.name);
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -1517,9 +1525,62 @@ pnpm start</pre>
       } catch (error) {
         setStatus(error.message, 'error');
       } finally {
+        stopEncodingClock();
         state.exporting = false;
         updateUI();
       }
+    }
+
+    /**
+     * POST a body and resolve with the response Blob, reporting upload progress
+     * along the way. fetch cannot observe upload progress in the browser, so this
+     * uses XMLHttpRequest; the endpoint and payload are unchanged.
+     */
+    function postForBlob(url, formData, { onUpload, onEncodingStart } = {}) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.responseType = 'blob';
+
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable && onUpload) onUpload(event.loaded / event.total);
+        });
+        xhr.upload.addEventListener('load', () => onEncodingStart && onEncodingStart());
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({ blob: xhr.response, xhr });
+            return;
+          }
+          // Errors come back as a JSON blob; read it for the server's message.
+          xhr.response
+            .text()
+            .then((text) => {
+              let message = 'Request failed.';
+              try {
+                message = JSON.parse(text).error || message;
+              } catch {}
+              reject(new Error(message));
+            })
+            .catch(() => reject(new Error('Request failed.')));
+        });
+        xhr.addEventListener('error', () => reject(new Error('Network error during upload.')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled.')));
+
+        xhr.send(formData);
+      });
+    }
+
+    /** Ticks an M:SS elapsed clock until stopped; returns the stop function. */
+    function startClock(onTick) {
+      const started = Date.now();
+      const format = (ms) => {
+        const total = Math.floor(ms / 1000);
+        return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+      };
+      onTick(format(0));
+      const timer = setInterval(() => onTick(format(Date.now() - started)), 500);
+      return () => clearInterval(timer);
     }
 
     function projectPayload() {
