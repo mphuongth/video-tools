@@ -569,7 +569,11 @@ pnpm start</pre>
           els.fileInput.click();
         }
       });
-      els.fileInput.addEventListener('change', () => addFiles(Array.from(els.fileInput.files || [])));
+      els.fileInput.addEventListener('change', () => {
+        addFiles(Array.from(els.fileInput.files || []));
+        // Clear it so choosing the same file again still fires a change event.
+        els.fileInput.value = '';
+      });
 
       for (const eventName of ['dragenter', 'dragover']) {
         els.dropzone.addEventListener(eventName, (event) => {
@@ -619,13 +623,25 @@ pnpm start</pre>
       render();
     }
 
-    function addFiles(files) {
-      if (!files.length) return;
-      revokeDownloads();
-      state.files = files;
-      state.results = [];
-      setStatus(`${files.length} file${files.length === 1 ? '' : 's'} selected.`);
+    // "Add files" accumulates — a second pick appends rather than replacing the
+    // list — and skips a file already staged, so dropping the same batch twice
+    // does not duplicate rows. Existing results are kept: re-running Compress is
+    // what rebuilds them.
+    function addFiles(incoming) {
+      if (!incoming.length) return;
+      const staged = new Set(state.files.map(fileKey));
+      const fresh = incoming.filter((file) => !staged.has(fileKey(file)));
+      if (!fresh.length) {
+        setStatus('Those files are already in the list.');
+        return;
+      }
+      state.files = [...state.files, ...fresh];
+      setStatus(`${state.files.length} file${state.files.length === 1 ? '' : 's'} selected.`);
       render();
+    }
+
+    function fileKey(file) {
+      return `${file.name}:${file.size}:${file.lastModified}`;
     }
 
     async function compressFiles() {
