@@ -117,7 +117,7 @@ function parseFrameRate(raw) {
   return Number.isFinite(value) ? clamp(value, 1, 120) : null;
 }
 
-function normalizeProject(rawProject) {
+export function normalizeProject(rawProject) {
   return {
     zooms: Array.isArray(rawProject?.zooms) ? rawProject.zooms.map(normalizeZoom) : [],
     texts: Array.isArray(rawProject?.texts) ? rawProject.texts.map(normalizeText) : [],
@@ -147,7 +147,7 @@ function normalizeText(raw, index) {
   };
 }
 
-function validateProject(project) {
+export function validateProject(project) {
   for (const zoom of project.zooms) {
     assertTimeRange(zoom, `Zoom ${zoom.id}`);
     if (!Number.isFinite(zoom.x) || !Number.isFinite(zoom.y) || zoom.x < 0 || zoom.x > 1 || zoom.y < 0 || zoom.y > 1) {

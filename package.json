@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node server.mjs",
     "serve": "node server.mjs",
-    "compress": "node tools/file-compressor/compressor.mjs"
+    "compress": "node tools/file-compressor/compressor.mjs",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
